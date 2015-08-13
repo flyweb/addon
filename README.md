@@ -1,2 +1,2 @@
-# addon
-A fly web add-on for firefox and fennec
+#FlyWeb
+A local-area web platform.
