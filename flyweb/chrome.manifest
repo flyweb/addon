@@ -1,0 +1,5 @@
+resource flyweb content/
+content flyweb content/
+locale flyweb en-US locale/en-US/
+overlay chrome://browser/content/browser.xul chrome://flyweb/content/browser.xul
+manifest components/flyweb.manifest
