@@ -48,6 +48,35 @@ function log(aMessage) {
   dump(_msg);
 }
 
+function RequireFile(path, prefix, windowObject) {
+    if (! /.js$/.test(path))
+        path = path + '.js';
+
+    if (!windowObject)
+        windowObject = {};
+
+    // Define the exports, module, and scope object.
+    let exports = {};
+    let module = {'exports':exports};
+    let scope = {
+        'module':module,
+        'exports':exports,
+        'window':windowObject,
+        'require':function (path) {
+            return RequireFile(path, prefix, windowObject);
+        }
+    };
+    let fullpath = "resource://flyweb/" + prefix + path;
+
+    // Use loadSubScript to load the script.
+    Services.scriptloader.loadSubScript(fullpath, scope);
+
+    // Bind all the property names on window to the real window.
+    return module.exports;
+}
+let dns_sd_window = {};
+let dns_sd = RequireFile("dns-sd", "dns-sd/", dns_sd_window);
+
 /**
  * FlyWeb API
  *
@@ -120,25 +149,15 @@ FlyWebAPI.prototype = {
     Services.obs.addObserver(this, "inner-window-destroyed", false);
 
     let api = {
-
-      // "pk": Public Key encryption namespace
-      FlyWeb: {
-        hello: self.hello.bind(self),
-        __exposedProps__: {
-          hello: "r"
-        }
-      },
-
-      __exposedProps__: {
-        FlyWeb: "r",
-      },
+      __exposedProps__: {}
     };
 
-    return api;
-  },
+    for (name of Object.getOwnPropertyNames(dns_sd_window)) {
+      api[name] = dns_sd_window[name];
+      api.__exposedProps__[name] = 'r';
+    }
 
-  hello: function () {
-    console.log("KVKV: HELLO!");
+    return api;
   }
 };
 
