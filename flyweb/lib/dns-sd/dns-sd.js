@@ -142,6 +142,8 @@ ByteArray.prototype.getReader = function(startByte) {
     getValue:  getValue,
     isEOF:     isEOF,
 
+    get offset() { return cursor; },
+
     byteArray: this
   };
 };
@@ -480,6 +482,8 @@ function DNSPacket(arrayBuffer) {
     return this;
   }
 
+  exports.PACKETS.push({buffer:arrayBuffer, packet:this});
+
   var byteArray = new ByteArray(arrayBuffer);
   var reader = byteArray.getReader();
 
@@ -502,24 +506,29 @@ function DNSPacket(arrayBuffer) {
     var name;
 
     for (var i = 0; i < count; i++) {
+      offset = reader.offset;
       name = DNSUtils.byteArrayToName(reader);// || name;
 
       if (recordSectionType === 'QD') {
-        this.addRecord(recordSectionType, new DNSQuestionRecord(
+        let rec = new DNSQuestionRecord(
           name,               // Name
           reader.getValue(2), // Type
           reader.getValue(2)  // Class
-        ));
+        );
+        rec.offset = offset;
+        this.addRecord(recordSectionType, rec);
       }
 
       else {
-        this.addRecord(recordSectionType, new DNSResourceRecord(
+        let rec = new DNSResourceRecord(
           name,                               // Name
           reader.getValue(2),                 // Type
           reader.getValue(2),                 // Class
           reader.getValue(4),                 // TTL
           reader.getBytes(reader.getValue(2)) // Data
-        ));
+        );
+        rec.offset = offset;
+        this.addRecord(recordSectionType, rec);
       }
     }
   });
@@ -685,7 +694,7 @@ DNSSD.getDiscoverySocket = function() {
           let packet = new DNSPacket(aMessage.rawData);
           switch (packet.flags.QR) {
             case DNSCodes.QUERY_RESPONSE_CODES.RESPONSE:
-              dump("KVKV: Reponse packet!\n");
+              dump("KVKV: Reponse packet:\n" + JSON.stringify(packet, null, 2) + "\n");
               handleResponsePacket.call(this, packet, aMessage);
               break;
             default:
@@ -901,32 +910,37 @@ function addServiceToPacket(serviceName, packet) {
  */
 
 var DNSUtils = {
-  byteArrayToName: function(byteArrayOrReader) {
+  parseNameIntoArray: function(byteArrayOrReader, outArray) {
     var byteArray;
     var reader;
 
     if (byteArrayOrReader instanceof ByteArray) {
       byteArray = byteArrayOrReader;
       reader = byteArray.getReader();
-    }
-
-    else {
+    } else {
       reader = byteArrayOrReader;
       byteArray = reader.byteArray;
     }
 
-    var parts = [];
     var partLength;
     while (partLength = reader.getValue()) {
-      // TODO: Handle case where we have a pointer to the name
-      if (partLength === 0xc0) {
-        reader.getValue();
+      if ((partLength & 0xc0) == 0xc0) {
+        // name pointer to elsewhere in the response.
+        var nextByte = reader.getValue();
+        var offset = ((partLength & 0x3f) << 8) | nextByte;
+        var subReader = byteArray.getReader(offset);
+        DNSUtils.parseNameIntoArray(subReader, outArray);
         break;
       }
 
-      parts.push(BinaryUtils.arrayBufferToString(reader.getBytes(partLength)));
+      var nameBytes = reader.getBytes(partLength);
+      outArray.push(BinaryUtils.arrayBufferToString(nameBytes));
     }
+  },
 
+  byteArrayToName: function(byteArrayOrReader) {
+    var parts = [];
+    DNSUtils.parseNameIntoArray(byteArrayOrReader, parts)
     return parts.join('.');
   },
 
@@ -1116,6 +1130,8 @@ exports.stopDiscovery = DNSSD.stopDiscovery;
 exports.registerService = DNSSD.registerService;
 
 exports.getDiscoverySocket = function () { return DNSSD.getDiscoverySocket() };
+
+exports.PACKETS = [];
 
 exports.on = on.bind(null, exports);
 exports.once = once.bind(null, exports);
