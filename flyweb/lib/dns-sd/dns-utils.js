@@ -2,7 +2,7 @@
 /*exported DNSUtils*/
 'use strict';
 
-module.exports = window.DNSUtils = (function() {
+module.exports = (function() {
 
 var ByteArray   = require('./byte-array');
 

@@ -2,7 +2,7 @@
 /*exported IPUtils*/
 'use strict';
 
-module.exports = window.IPUtils = (function() {
+module.exports = (function() {
 
 const CRLF = '\r\n';
 

@@ -2,7 +2,7 @@
 /*exported EventTarget*/
 'use strict';
 
-module.exports = window.EventTarget = (function() {
+module.exports = (function() {
 
 function EventTarget(object) {
   if (typeof object !== 'object') {

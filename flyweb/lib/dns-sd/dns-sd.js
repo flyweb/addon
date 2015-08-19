@@ -2,7 +2,7 @@
 /*exported DNSSD*/
 'use strict';
 
-module.exports = window.DNSSD = (function() {
+module.exports = (function() {
 
 var DNSRecord         = require('./dns-record');
 var DNSResourceRecord = require('./dns-resource-record');

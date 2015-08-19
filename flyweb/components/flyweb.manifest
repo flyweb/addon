@@ -1,4 +1,0 @@
-component {4e544888-f44c-4311-8223-d7a9b31fab16} flyweb.js
-contract @mozilla.org/flyweb;1 {4e544888-f44c-4311-8223-d7a9b31fab16}
-category JavaScript-global-property FlyWeb @mozilla.org/flyweb;1
-category app-startup flyweb @mozilla.org/flyweb;1

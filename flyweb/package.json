@@ -1,0 +1,13 @@
+{
+  "title": "Fly Web",
+  "name": "flyweb",
+  "version": "0.0.1",
+  "description": "Web architecture for local-area applications",
+  "main": "index.js",
+  "author": "Kannan Vijayan",
+  "engines": {
+    "firefox": ">=38.0a1",
+    "fennec": ">=38.0a1"
+  },
+  "license": "MIT"
+}

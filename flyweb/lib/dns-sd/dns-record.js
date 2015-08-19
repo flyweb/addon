@@ -2,7 +2,7 @@
 /*exported DNSRecord*/
 'use strict';
 
-module.exports = window.DNSRecord = (function() {
+module.exports = (function() {
 
 var DNSCodes  = require('./dns-codes');
 var DNSUtils  = require('./dns-utils');
