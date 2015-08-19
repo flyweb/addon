@@ -520,13 +520,14 @@ function DNSPacket(arrayBuffer) {
       }
 
       else {
-        let rec = new DNSResourceRecord(
-          name,                               // Name
-          reader.getValue(2),                 // Type
-          reader.getValue(2),                 // Class
-          reader.getValue(4),                 // TTL
-          reader.getBytes(reader.getValue(2)) // Data
-        );
+        let type = reader.getValue(2);
+        let cls = reader.getValue(2);
+        let ttl = reader.getValue(4);
+        let dataLen = reader.getValue(2);
+        let dataOffset = reader.offset;
+        let data = reader.getBytes(dataLen);
+        let rec = new DNSResourceRecord(name, type, cls, ttl, data);
+        rec.parseData(byteArray, dataOffset);
         rec.offset = offset;
         this.addRecord(recordSectionType, rec);
       }
@@ -597,6 +598,7 @@ DNSPacket.prototype.serialize = function() {
 function DNSQuestionRecord(name, recordType, classCode) {
   this.name = name;
   this.recordType = recordType;
+  this.recordTypeName = DNSCodes.RECORD_TYPES(recordType) || "!!UNKNOWN!!";
   this.classCode = classCode || DNSCodes.CLASS_CODES.IN;
 }
 
@@ -611,6 +613,7 @@ DNSQuestionRecord.prototype.constructor = DNSQuestionRecord;
 function DNSRecord(name, recordType, classCode) {
   this.name = name;
   this.recordType = recordType;
+  this.recordTypeName = DNSCodes.RECORD_TYPES(recordType) || "!!UNKNOWN!!";
   this.classCode = classCode || DNSCodes.CLASS_CODES.IN;
 }
 
@@ -626,6 +629,7 @@ const DNS_RESOURCE_RECORD_DEFAULT_TTL = 10; // 10 seconds
 function DNSResourceRecord(name, recordType, classCode, ttl, data) {
   this.name = name;
   this.recordType = recordType;
+  this.recordTypeName = DNSCodes.RECORD_TYPES(recordType) || "!!UNKNOWN!!";
   this.classCode = classCode || DNSCodes.CLASS_CODES.IN;
   this.ttl = ttl || DNS_RESOURCE_RECORD_DEFAULT_TTL;
   this.data = data;
@@ -635,8 +639,16 @@ DNSResourceRecord.prototype = Object.create(DNSRecord.prototype);
 
 DNSResourceRecord.prototype.constructor = DNSResourceRecord;
 
+DNSResourceRecord.prototype.parseData = function (packetData, offset) {
+  let reader = packetData.getReader(offset);
+  if (this.recordType === DNSCodes.RECORD_TYPES.PTR) {
+    let name = DNSUtils.byteArrayToName(reader);
+    this.parsedData = {name: name};
+  }
+};
+
 DNSResourceRecord.prototype.getData = function() {
-  return DNSUtils.byteArrayToName(new ByteArray(this.data));
+  return this.parsedData;
 };
 
 DNSResourceRecord.prototype.getName = function() {
@@ -771,11 +783,11 @@ function handleResponsePacket(packet, message) {
     if (record.recordType === DNSCodes.RECORD_TYPES.PTR) {
       let name = record.getName();
       dump("KVKV: -- -- is PTR record! name=" + name + "\n");
-      let domain = record.getData();
+      let domain = record.getData().name;
       if (name && domain && name[0] == '_' && name.indexOf('.local') != -1) {
         services.push(record.getName());
         domainNames.push(record.getData());
-        dump("PTR = name: " + record.getName() + " data: " + record.getData() + "\n");
+        dump("PTR = name: " + name + " data: " + domain + "\n");
       }
     }
 
