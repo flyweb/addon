@@ -7,7 +7,8 @@ var categoryManager = Cc["@mozilla.org/categorymanager;1"]
                       .getService(Ci.nsICategoryManager);
 
 var contractId = '@mozilla.org/flyweb;1';
-var dns_sd = require('./dns-sd/dns-sd');
+
+var dnsSD = require('./dns-sd');
 
 var FlyWeb = Class({
   extends: xpcom.Unknown,
@@ -24,7 +25,7 @@ var FlyWeb = Class({
         return eval(string);
       },
 
-      dns_sd: dns_sd,
+      dns_sd: dnsSD,
 
       __exposedProps__: {
         hello: 'r',
