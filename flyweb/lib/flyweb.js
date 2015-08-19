@@ -8,7 +8,7 @@ var categoryManager = Cc["@mozilla.org/categorymanager;1"]
 
 var contractId = '@mozilla.org/flyweb;1';
 
-var dnsSD = require('./dns-sd');
+var dnsSD = require('./dns-sd/dns-sd');
 
 var FlyWeb = Class({
   extends: xpcom.Unknown,

@@ -1,7 +1,7 @@
 var { emit, on, once, off } = require("sdk/event/core");
 var {Cc, Ci, Cu} = require("chrome");
 
-var utils = require("./utils");
+var utils = require("../utils");
 
 /* The following was modified from https://github.com/justindarc/dns-sd.js */
 
