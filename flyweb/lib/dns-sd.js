@@ -647,7 +647,7 @@ var DNSSD = new EventTarget();
 var discovering = false;
 var services = {};
 
-DNSSD.getSocket = function() {
+DNSSD.getAdvertisingSocket = function() {
   return new Promise((resolve) => {
     if (!this.advertisingSocket) {
       this.advertisingSocket = utils.newUDPSocket({localPort: DNSSD_PORT,
@@ -659,11 +659,8 @@ DNSSD.getSocket = function() {
             case DNSCodes.QUERY_RESPONSE_CODES.QUERY:
               handleQueryPacket.call(this, packet, aMessage);
               break;
-            case DNSCodes.QUERY_RESPONSE_CODES.RESPONSE:
-              handleResponsePacket.call(this, packet, aMessage);
-              break;
             default:
-            break;
+              break;
           }
         },
 
@@ -687,15 +684,12 @@ DNSSD.getDiscoverySocket = function() {
           dump("KVKV: Packet received on discovery socket! " + aMessage.rawData + "\n");
           let packet = new DNSPacket(aMessage.rawData);
           switch (packet.flags.QR) {
-            case DNSCodes.QUERY_RESPONSE_CODES.QUERY:
-              handleQueryPacket.call(this, packet, aMessage);
-              break;
             case DNSCodes.QUERY_RESPONSE_CODES.RESPONSE:
               dump("KVKV: Reponse packet!\n");
               handleResponsePacket.call(this, packet, aMessage);
               break;
             default:
-            break;
+              break;
           }
         },
 
@@ -764,17 +758,20 @@ function handleResponsePacket(packet, message) {
   var services = [];
   var domainNames =[];
   packet.getRecords('AN').forEach((record) => {
+    dump("KVKV: -- AN record!\n");
     if (record.recordType === DNSCodes.RECORD_TYPES.PTR) {
       let name = record.getName();
+      dump("KVKV: -- -- is PTR record! name=" + name + "\n");
       let domain = record.getData();
       if (name && domain && name[0] == '_' && name.indexOf('.local') != -1) {
         services.push(record.getName());
         domainNames.push(record.getData());
-        console.log("PTR = name: " + record.getName() + " data: " + record.getData());
+        dump("PTR = name: " + record.getName() + " data: " + record.getData() + "\n");
       }
     }
 
     if (record.recordType === DNSCodes.RECORD_TYPES.SRV) {
+      dump("KVKV: -- -- is SRV record!\n");
       // SRV data does not work yet
       // console.log("SRV = name: " + record.getName() + " data: " + record.getData());
     }
@@ -854,6 +851,8 @@ function advertise() {
     // setTimeout(() => {
     //   socket.send(data, DNSSD_MULTICAST_GROUP, DNSSD_PORT);
     // }, 1000);
+  }).catch((err) => {
+    dump("KVKV: Caught error: " + err.toString() + "\n");
   });
 }
 
