@@ -47,7 +47,13 @@ DNSResourceRecord.prototype.parseData = function (packetData, offset) {
   let reader = packetData.getReader(offset);
   if (this.recordType === DNSCodes.RECORD_TYPES.PTR) {
     let name = DNSUtils.byteArrayToName(reader);
-    this.parsedData = {name: name};
+    this.parsedData = {name};
+  } else if (this.recordType == DNSCodes.RECORD_TYPES.SRV) {
+    let priority = reader.getValue(2);
+    let weight = reader.getValue(2);
+    let port = reader.getValue(2);
+    let target = DNSUtils.byteArrayToName(reader);
+    this.parsedData = {priority,weight,port,target};
   }
 };
 
