@@ -1,7 +1,7 @@
 "use strict";
 
-var BinaryUtils = require('./binary-utils');
-var ByteArray = require('./byte-array');
+var {BinaryUtils} = require('./binary-utils');
+var {ByteArray} = require('./byte-array');
 
 function parseNameIntoArray(reader, outArray) {
   const byteArray = reader.byteArray;
@@ -94,9 +94,10 @@ function flagsToValue(flags) {
   return value;
 }
 
-
-exports.parseNameIntoArray = parseNameIntoArray;
-exports.byteArrayToName = byteArrayToName;
-exports.nameToByteArray = nameToByteArray;
-exports.valueToFlags = valueToFlags;
-exports.flagsToValue = flagsToValue;
+exports.DNSUtils = {
+  parseNameIntoArray,
+  byteArrayToName,
+  nameToByteArray,
+  valueToFlags,
+  flagsToValue
+};

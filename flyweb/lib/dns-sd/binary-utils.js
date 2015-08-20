@@ -39,7 +39,9 @@ function mergeArrayBuffers(arrayBuffers, callback) {
   return blobToArrayBuffer(new Blob(arrayBuffers), callback);
 }
 
-exports.stringToArrayBuffer = stringToArrayBuffer;
-exports.arrayBufferToString = arrayBufferToString;
-exports.blobToArrayBuffer = blobToArrayBuffer;
-exports.mergeArrayBuffers = mergeArrayBuffers;
+exports.BinaryUtils = {
+  stringToArrayBuffer,
+  arrayBufferToString,
+  blobToArrayBuffer,
+  mergeArrayBuffers
+};

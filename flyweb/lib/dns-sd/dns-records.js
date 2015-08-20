@@ -1,7 +1,7 @@
 "use strict";
 
-var DNSCodes = require('./dns-codes');
-var DNSUtils = require('./dns-utils');
+var {DNSCodes} = require('./dns-codes');
+var {DNSUtils} = require('./dns-utils');
 
 /**
  * DNSRecord

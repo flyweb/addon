@@ -1,7 +1,7 @@
 "use strict";
 
-var ByteArray = require('./byte-array');
-var DNSUtils = require('./dns-utils');
+var {ByteArray} = require('./byte-array');
+var {DNSUtils} = require('./dns-utils');
 var {DNSRecord,
      DNSQuestionRecord,
      DNSResourceRecord} = require('./dns-records');

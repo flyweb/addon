@@ -136,4 +136,4 @@ function uint8ArrayToValue(uint8Array) {
   return value;
 }
 
-module.exports = ByteArray;
+exports.ByteArray = ByteArray;

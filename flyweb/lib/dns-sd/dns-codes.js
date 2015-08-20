@@ -174,4 +174,4 @@ var DNSCodes = {
   RECORD_TYPES                : RECORD_TYPES
 };
 
-module.exports = DNSCodes;
+exports.DNSCodes = DNSCodes;

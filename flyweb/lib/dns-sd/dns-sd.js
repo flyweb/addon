@@ -2,10 +2,10 @@ var { emit, on, once, off } = require("sdk/event/core");
 var {Cc, Ci, Cu} = require("chrome");
 
 var utils = require("../utils");
-var BinaryUtils = require('./binary-utils');
-var ByteArray = require('./byte-array');
-var DNSCodes = require('./dns-codes');
-var DNSUtils = require('./dns-utils');
+var {BinaryUtils} = require('./binary-utils');
+var {ByteArray} = require('./byte-array');
+var {DNSCodes} = require('./dns-codes');
+var {DNSUtils} = require('./dns-utils');
 var {DNSRecord,
      DNSQuestionRecord,
      DNSResourceRecord} = require('./dns-records');
