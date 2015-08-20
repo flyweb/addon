@@ -1,5 +1,7 @@
 "use strict";
 
+var {BinaryUtils} = require('./binary-utils');
+var {ByteArray} = require('./byte-array');
 var {DNSCodes} = require('./dns-codes');
 var {DNSUtils} = require('./dns-utils');
 
@@ -44,16 +46,28 @@ DNSResourceRecord.prototype = Object.create(DNSRecord.prototype);
 DNSResourceRecord.prototype.constructor = DNSResourceRecord;
 
 DNSResourceRecord.prototype.parseData = function (packetData, offset) {
-  let reader = packetData.getReader(offset);
   if (this.recordType === DNSCodes.RECORD_TYPES.PTR) {
+    let reader = packetData.getReader(offset);
     let name = DNSUtils.byteArrayToName(reader);
     this.parsedData = {name};
   } else if (this.recordType == DNSCodes.RECORD_TYPES.SRV) {
+    let reader = packetData.getReader(offset);
     let priority = reader.getValue(2);
     let weight = reader.getValue(2);
     let port = reader.getValue(2);
     let target = DNSUtils.byteArrayToName(reader);
     this.parsedData = {priority,weight,port,target};
+  } else if (this.recordType == DNSCodes.RECORD_TYPES.TXT) {
+    let byteArray = new ByteArray(this.data.buffer);
+    let reader = byteArray.getReader(0);
+    let parts = [];
+    let partLength;
+    while (partLength = reader.getValue()) {
+      let bytes = reader.getBytes(partLength);
+      let str = BinaryUtils.arrayBufferToString(bytes);
+      parts.push(str);
+    }
+    this.parsedData = {parts};
   }
 };
 
