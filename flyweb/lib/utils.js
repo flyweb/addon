@@ -11,5 +11,12 @@ function newUDPSocket(config) {
     return sock;
 }
 
+function raiseError(err) {
+    dump("!!! Exception raised: " + err.toString() + "\n");
+    dump(err.stack + "\n");
+    throw err;
+}
+
 exports.systemPrincipal = systemPrincipal;
 exports.newUDPSocket = newUDPSocket;
+exports.raiseError = raiseError;
