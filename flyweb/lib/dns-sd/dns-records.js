@@ -68,6 +68,15 @@ DNSResourceRecord.prototype.parseData = function (packetData, offset) {
       parts.push(str);
     }
     this.parsedData = {parts};
+  } else if (this.recordType == DNSCodes.RECORD_TYPES.A) {
+    let byteArray = new ByteArray(this.data.buffer);
+    let reader = byteArray.getReader(0);
+    let parts = [];
+    for (let i = 0; i < 4; i++) {
+        parts.push('' + reader.getValue());
+    }
+    let ip = parts.join('.');
+    this.parsedData = {ip};
   }
 };
 
