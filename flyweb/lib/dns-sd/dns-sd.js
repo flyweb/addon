@@ -20,8 +20,10 @@ var {DiscoverRegistry} = require('./discover-registry');
  */
 
 const DNSSD_SERVICE_NAME    = '_services._dns-sd._udp.local';
-const DNSSD_MULTICAST_GROUP = '224.0.0.251';
-const DNSSD_PORT            = 5353;
+//const DNSSD_MULTICAST_GROUP = '224.0.0.251';
+//const DNSSD_PORT            = 5353;
+const DNSSD_MULTICAST_GROUP = '224.0.1.253';
+const DNSSD_PORT            = 6363;
 
 var DNSSD = new EventTarget();
 
@@ -93,8 +95,11 @@ DNSSD.stopDiscovery = function() {
   discovering = false;
 };
 
-DNSSD.registerService = function(serviceName, port, options) {
-  services[serviceName] = {
+DNSSD.registerService = function(serviceName, name, port, options) {
+  let fullname = name + '.' + serviceName;
+  services[fullname] = {
+    serviceName: serviceName,
+    name: name,
     port: port || 0,
     options: options || {}
   };
@@ -188,8 +193,8 @@ function advertise() {
   packet.flags.QR = DNSCodes.QUERY_RESPONSE_CODES.RESPONSE;
   packet.flags.AA = DNSCodes.AUTHORITATIVE_ANSWER_CODES.YES;
 
-  for (var serviceName in services) {
-    addServiceToPacket(serviceName, packet);
+  for (var fullname in services) {
+    addServiceToPacket(fullname, packet);
   }
 
   DNSSD.getAdvertisingSocket().then((socket) => {
@@ -203,6 +208,7 @@ function advertise() {
       let charcode = raw.getUint8(x);
       buf[x] = charcode;
     }
+    dump("KVKV: Sending data: " + JSON.stringify(buf) + "\n");
     socket.send(DNSSD_MULTICAST_GROUP, DNSSD_PORT, buf, buf.length);
 
     // Re-broadcast announcement after 1000ms (RFC6762, 8.3).
@@ -215,44 +221,39 @@ function advertise() {
   });
 }
 
-function addServiceToPacket(serviceName, packet) {
-  var service = services[serviceName];
+function addServiceToPacket(fullname, packet) {
+  var service = services[fullname];
   if (!service) {
     return;
   }
 
-  var alias = serviceName;
+  var location = service.name + '.' + service.serviceName;
+
+  // PTR Record
+  var ptrRecord = new DNSResourceRecord(service.serviceName,
+                                         DNSCodes.RECORD_TYPES.PTR);
+  ptrRecord.setParsedData({location});
+  packet.addRecord('AN', ptrRecord);
 
   // SRV Record
-  // var srv = new DNSResourceRecord(alias, DNSCodes.RECORD_TYPES.SRV);
-  // var srvData = new ByteArray();
-  // srvData.push(0x0000, 2);        // Priority
-  // srvData.push(0x0000, 2);        // Weight
-  // srvData.push(service.port, 2);  // Port
-  // srvData.append(DNSUtils.nameToByteArray(serviceName));
-  // srv.data = srvData;
-  // packet.addRecord('AR', srv);
+  let priority = 0;
+  let weight = 0;
+  let port = service.port;
+  let target = service.name + '.local';
+  var srvRecord = new DNSResourceRecord(location,
+                                        DNSCodes.RECORD_TYPES.SRV);
+  srvRecord.setParsedData({priority,weight,port,target});
+  packet.addRecord('AR', srvRecord);
 
-  // TXT Record
-  // var txt = new DNSResourceRecord(alias, DNSCodes.RECORD_TYPES.TXT);
-  // var txtData = new ByteArray();
-
-  // for (var key in service.options) {
-  //   txtData.append(DNSUtils.nameToByteArray(key + '=' + service.options[key]));
-  // }
-
-  // txt.data = txtData;
-  // packet.addRecord('AR', txt);
-
-  // PTR Wildcard Record
-  var ptrWildcard = new DNSResourceRecord(DNSSD_SERVICE_NAME, DNSCodes.RECORD_TYPES.PTR);
-  ptrWildcard.data = DNSUtils.nameToByteArray(serviceName);
-  packet.addRecord('AN', ptrWildcard);
-
-  // PTR Service Record
-  var ptrService = new DNSResourceRecord(serviceName, DNSCodes.RECORD_TYPES.PTR);
-  ptrService.data = DNSUtils.nameToByteArray(alias);
-  packet.addRecord('AN', ptrService);
+  // TXT record
+  let parts = [];
+  for (let name in service.options) {
+    parts.push(name + "=" + service.options[name]);
+  }
+  var txtRecord = new DNSResourceRecord(location,
+                                        DNSCodes.RECORD_TYPES.TXT);
+  txtRecord.setParsedData({parts});
+  packet.addRecord('AR', txtRecord);
 }
 
 /**

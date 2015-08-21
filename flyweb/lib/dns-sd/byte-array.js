@@ -34,14 +34,6 @@ class ByteArray {
   }
 
   append(bytes) {
-    if (bytes instanceof ByteArray) {
-      bytes = bytes.buffer;
-    }
-
-    if (bytes instanceof ArrayBuffer) {
-      bytes = new Uint8Array(bytes);
-    }
-
     for (var i = 0, byteLength = bytes.length; i < byteLength; i++) {
       this._data[this._cursor] = bytes[i];
       this._cursor++;

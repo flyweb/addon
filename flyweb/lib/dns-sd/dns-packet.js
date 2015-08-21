@@ -207,8 +207,9 @@ DNSPacket.prototype.serialize = function() {
       }
 
       byteArray.push(record.ttl, 4);
-      byteArray.push(data.length, 2);
-      byteArray.append(data);
+
+      byteArray.push(record.data.length, 2);
+      byteArray.append(record.data);
     });
   });
 

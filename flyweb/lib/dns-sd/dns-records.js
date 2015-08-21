@@ -81,6 +81,53 @@ DNSResourceRecord.prototype.parseData = function (packetData, offset) {
   }
 };
 
+DNSResourceRecord.prototype.setParsedData = function (obj) {
+  this.parsedData = obj;
+  if (!this.parsedData) {
+    this.data = new Uint8Array(new ArrayBuffer(0));
+    return;
+  }
+  this.serializeRData();
+};
+
+DNSResourceRecord.prototype.serializeRData = function () {
+  if (this.recordType === DNSCodes.RECORD_TYPES.PTR) {
+    let buf = DNSUtils.nameToByteArray(this.parsedData.location).buffer;
+    this.data = new Uint8Array(buf);
+
+  } else if (this.recordType === DNSCodes.RECORD_TYPES.SRV) {
+    let byteArray = new ByteArray();
+    byteArray.push(this.parsedData.priority, 2);
+    byteArray.push(this.parsedData.weight, 2);
+    byteArray.push(this.parsedData.port, 2);
+
+    let buf = DNSUtils.nameToByteArray(this.parsedData.target).buffer;
+    byteArray.append(new Uint8Array(buf));
+
+    this.data = new Uint8Array(byteArray.buffer);
+
+  } else if (this.recordType === DNSCodes.RECORD_TYPES.TXT) {
+    let byteArray = new ByteArray();
+    for (let part of this.parsedData.parts) {
+      byteArray.push(part.length, 1);
+      for (let i = 0; i < part.length; i++)
+        byteArray.push(part.charCodeAt(i) & 0xff, 1);
+    }
+
+    this.data = new Uint8Array(byteArray.buffer);
+
+  } else if (this.recordType === DNSCodes.RECORD_TYPES.A) {
+    let byteArray = new ByteArray();
+    let ip = this.parsedData.ip;
+    byteArray.push((ip >> 24) & 0xff, 1);
+    byteArray.push((ip >> 16) & 0xff, 1);
+    byteArray.push((ip >> 8) & 0xff, 1);
+    byteArray.push(ip & 0xff, 1);
+    this.data = new Uint8Array(byteArray.buffer);
+
+  }
+};
+
 DNSResourceRecord.prototype.getData = function() {
   return this.parsedData;
 };
