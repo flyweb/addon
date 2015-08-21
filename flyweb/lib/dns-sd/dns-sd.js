@@ -1,4 +1,3 @@
-var { emit, on, once, off } = require("sdk/event/core");
 var {Cc, Ci, Cu} = require("chrome");
 
 var utils = require("../utils");
@@ -12,6 +11,7 @@ var {DNSRecord,
 var {DNSPacket, PACKETS} = require('./dns-packet');
 
 var {EventTarget} = require('./event-target');
+var {DiscoverRegistry} = require('./discover-registry');
 
 /* The following was modified from https://github.com/justindarc/dns-sd.js */
 
@@ -26,6 +26,7 @@ const DNSSD_PORT            = 5353;
 var DNSSD = new EventTarget();
 
 var discovering = false;
+var discoverRegistry = new DiscoverRegistry();
 var services = {};
 
 DNSSD.getAdvertisingSocket = function() {
@@ -61,24 +62,22 @@ DNSSD.getDiscoverySocket = function() {
       this.discoverySocket = utils.newUDPSocket({localPort: 0,
                                                  loopback: false});
       this.discoverySocket.asyncListen({
-        onPacketReceived: function(aSocket, aMessage) {
-          dump("KVKV: Packet received on discovery socket! " + aMessage.rawData + "\n");
+        onPacketReceived(aSocket, aMessage) {
           let packet = new DNSPacket(aMessage.rawData);
           switch (packet.flags.QR) {
             case DNSCodes.QUERY_RESPONSE_CODES.RESPONSE:
-              dump("KVKV: Reponse packet:\n" + JSON.stringify(packet, null, 2) + "\n");
-              handleResponsePacket.call(this, packet, aMessage);
+              handleResponsePacket(packet);
               break;
             default:
               break;
           }
         },
-
-        onStopListening: function(aSocket, aStatus) {
+        onStopListening(aSocket, aStatus) {
+          if (handler.onStopListening)
+            handler.onStopListening(aStatus);
         },
       });
     }
-
     resolve(this.discoverySocket);
   });
 };
@@ -131,59 +130,37 @@ function handleQueryPacket(packet, message) {
   });
 }
 
-function handleResponsePacket(packet, message) {
+function handleResponsePacket(packet) {
   if (!discovering) {
     return;
   }
 
-  var services = [];
-  var domainNames =[];
+  let seenServices = new Set();
   packet.getRecords('AN').forEach((record) => {
-    dump("KVKV: -- AN record!\n");
-    if (record.recordType === DNSCodes.RECORD_TYPES.PTR) {
-      let name = record.getName();
-      dump("KVKV: -- -- is PTR record! name=" + name + "\n");
-      let domain = record.getData().name;
-      if (name && domain && name[0] == '_' && name.indexOf('.local') != -1) {
-        services.push(record.getName());
-        domainNames.push(record.getData());
-        dump("PTR = name: " + name + " data: " + domain + "\n");
-      }
-    }
-
-    if (record.recordType === DNSCodes.RECORD_TYPES.SRV) {
-      dump("KVKV: -- -- is SRV record!\n");
-      // SRV data does not work yet
-      // console.log("SRV = name: " + record.getName() + " data: " + record.getData());
-    }
+    handleResponseRecord(record, seenServices);
+  });
+  packet.getRecords('AR').forEach((record) => {
+    handleResponseRecord(record, seenServices);
   });
 
-  emit(exports, 'discovered', {
-    address: message.fromAddr.address,
-    services: services,
-    domainNames: domainNames
-  });
+  for (let svc of seenServices) {
+    let svcInfo = discoverRegistry.serviceInfo(svc);
+    dump("KVKV: Seen service " + svc + ": " + JSON.stringify(svcInfo) + "\n");
+  }
+}
 
-  DNSSD.dispatchEvent('discovered', {
-    message: message,
-    packet: packet,
-    //address: message.remoteAddress,
-    address: message.fromAddr.address,
-    services: services
-  });
+function handleResponseRecord(record, seenServices) {
+  discoverRegistry.addRecord(record, seenServices);
 }
 
 function discover(target) {
   var packet = new DNSPacket();
-
   packet.flags.QR = DNSCodes.QUERY_RESPONSE_CODES.QUERY;
-
-  var question = new DNSQuestionRecord(target ? target : DNSSD_SERVICE_NAME, DNSCodes.RECORD_TYPES.PTR);
+  var question = new DNSQuestionRecord(target ? target : DNSSD_SERVICE_NAME,
+                                       DNSCodes.RECORD_TYPES.PTR);
   packet.addRecord('QD', question);
 
-  dump("KVKV: discover()\n");
   DNSSD.getDiscoverySocket().then((socket) => {
-    dump("KVKV: discover() - got socket\n");
     var data = packet.serialize();
     // socket.send(data, DNSSD_MULTICAST_GROUP, DNSSD_PORT);
 
@@ -194,10 +171,10 @@ function discover(target) {
       let charcode = raw.getUint8(x);
       buf[x] = charcode;
     }
-    dump("KVKV: discover() - sending data: " + buf + "\n");
     socket.send( DNSSD_MULTICAST_GROUP, DNSSD_PORT, buf, buf.length);
   }).catch((err) => {
-    dump("KVKV: Caught error: " + err.toString() + "\n");
+    dump("Caught error: " + err.toString() + "\n");
+    dump(err.stack + "\n");
   });
 }
 
@@ -233,7 +210,8 @@ function advertise() {
     //   socket.send(data, DNSSD_MULTICAST_GROUP, DNSSD_PORT);
     // }, 1000);
   }).catch((err) => {
-    dump("KVKV: Caught error: " + err.toString() + "\n");
+    dump("Caught error: " + err.toString() + "\n");
+    dump(err.stack + "\n");
   });
 }
 
@@ -285,12 +263,4 @@ exports.startDiscovery = DNSSD.startDiscovery;
 exports.stopDiscovery = DNSSD.stopDiscovery;
 exports.registerService = DNSSD.registerService;
 
-exports.getDiscoverySocket = function () { return DNSSD.getDiscoverySocket() };
-
 exports.PACKETS = PACKETS;
-
-exports.on = on.bind(null, exports);
-exports.once = once.bind(null, exports);
-exports.removeListener = function removeListener(type, listener) {
-  off(exports, type, listener);
-};

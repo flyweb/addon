@@ -17,6 +17,17 @@ function raiseError(err) {
     throw err;
 }
 
+function tryWrap(fn) {
+    try {
+        fn();
+    } catch(err) {
+        dump("tryWrap ERROR: " + err.toString() + "\n");
+        dump(err.stack + "\n");
+        throw err;
+    }
+}
+
 exports.systemPrincipal = systemPrincipal;
 exports.newUDPSocket = newUDPSocket;
 exports.raiseError = raiseError;
+exports.tryWrap = tryWrap;

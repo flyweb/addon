@@ -11,6 +11,7 @@ var {DNSUtils} = require('./dns-utils');
 
 function DNSRecord(name, recordType, classCode) {
   this.name = name;
+  this.timestamp = Date.now();
   this.recordType = recordType;
   this.recordTypeName = DNSCodes.RECORD_TYPES(recordType) || "!!UNKNOWN!!";
   this.classCode = classCode || DNSCodes.CLASS_CODES.IN;
@@ -48,8 +49,8 @@ DNSResourceRecord.prototype.constructor = DNSResourceRecord;
 DNSResourceRecord.prototype.parseData = function (packetData, offset) {
   if (this.recordType === DNSCodes.RECORD_TYPES.PTR) {
     let reader = packetData.getReader(offset);
-    let name = DNSUtils.byteArrayToName(reader);
-    this.parsedData = {name};
+    let location = DNSUtils.byteArrayToName(reader);
+    this.parsedData = {location};
   } else if (this.recordType == DNSCodes.RECORD_TYPES.SRV) {
     let reader = packetData.getReader(offset);
     let priority = reader.getValue(2);
