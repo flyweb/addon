@@ -27,7 +27,41 @@ function tryWrap(fn) {
     }
 }
 
+function getIp() {
+  return new Promise((resolve, reject) => {
+    let receiver = newUDPSocket({localPort: 0, loopback: false});
+    let sender = newUDPSocket({localPort: 0, loopback: false});
+    const MULTICAST_GROUP = '224.0.2.222';
+    const PORT = receiver.port;
+
+    receiver.asyncListen({
+      onPacketReceived: function(aSocket, aMessage) {
+        let packet = aMessage.rawData;
+        let addr = aMessage.fromAddr.address;
+        receiver.close();
+        sender.close();
+        resolve(addr);
+      },
+
+      onStopListening: function(aSocket, aStatus) {
+      },
+    });
+    receiver.joinMulticast(MULTICAST_GROUP);
+
+    let msg = "FLYWEB_IP_HACK";
+    let msgarray = [];
+    for (let i = 0; i < msg.length; i++)
+        msgarray.push(msg.charCodeAt(i));
+    sender.asyncListen({
+      onPacketReceived: function(aSocket, aMessage) {},
+      onStopListening: function(aSocket, aStatus) {},
+    });
+    sender.send(MULTICAST_GROUP, PORT, msgarray, msgarray.length);
+  });
+}
+
 exports.systemPrincipal = systemPrincipal;
 exports.newUDPSocket = newUDPSocket;
 exports.raiseError = raiseError;
 exports.tryWrap = tryWrap;
+exports.getIp = getIp;
