@@ -27,6 +27,9 @@ class ByteArray {
   get buffer() {
     return this._buffer.slice(0, this._cursor);
   }
+  get data() {
+    return this._data.slice(0, this._cursor);
+  }
 
   push(value, byteLength) {
     byteLength = byteLength || 1;

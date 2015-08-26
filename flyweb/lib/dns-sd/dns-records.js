@@ -92,8 +92,7 @@ DNSResourceRecord.prototype.setParsedData = function (obj) {
 
 DNSResourceRecord.prototype.serializeRData = function () {
   if (this.recordType === DNSCodes.RECORD_TYPES.PTR) {
-    let buf = DNSUtils.nameToByteArray(this.parsedData.location).buffer;
-    this.data = new Uint8Array(buf);
+    this.data = DNSUtils.nameToByteArray(this.parsedData.location);
 
   } else if (this.recordType === DNSCodes.RECORD_TYPES.SRV) {
     let byteArray = new ByteArray();
@@ -101,8 +100,8 @@ DNSResourceRecord.prototype.serializeRData = function () {
     byteArray.push(this.parsedData.weight, 2);
     byteArray.push(this.parsedData.port, 2);
 
-    let buf = DNSUtils.nameToByteArray(this.parsedData.target).buffer;
-    byteArray.append(new Uint8Array(buf));
+    let buf = DNSUtils.nameToByteArray(this.parsedData.target);
+    byteArray.append(buf);
 
     this.data = new Uint8Array(byteArray.buffer);
 
@@ -118,11 +117,11 @@ DNSResourceRecord.prototype.serializeRData = function () {
 
   } else if (this.recordType === DNSCodes.RECORD_TYPES.A) {
     let byteArray = new ByteArray();
-    let ip = this.parsedData.ip;
-    byteArray.push((ip >> 24) & 0xff, 1);
-    byteArray.push((ip >> 16) & 0xff, 1);
-    byteArray.push((ip >> 8) & 0xff, 1);
-    byteArray.push(ip & 0xff, 1);
+    let ip = this.parsedData.ip.split('.').map(x => parseInt(x));
+    byteArray.push(ip[0] & 0xff);
+    byteArray.push(ip[1] & 0xff);
+    byteArray.push(ip[2] & 0xff);
+    byteArray.push(ip[3] & 0xff);
     this.data = new Uint8Array(byteArray.buffer);
 
   }

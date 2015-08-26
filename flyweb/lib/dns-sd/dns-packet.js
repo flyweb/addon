@@ -197,6 +197,7 @@ DNSPacket.prototype.serialize = function() {
 
   DNSPacket.RECORD_SECTION_TYPES.forEach((recordSectionType) => {
     this.records[recordSectionType].forEach((record) => {
+      let ba = DNSUtils.nameToByteArray(record.name);
       byteArray.append(DNSUtils.nameToByteArray(record.name));
       byteArray.push(record.recordType, 2);
       byteArray.push(record.classCode, 2);

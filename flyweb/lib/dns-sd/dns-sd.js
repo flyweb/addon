@@ -193,35 +193,41 @@ function advertise() {
   packet.flags.QR = DNSCodes.QUERY_RESPONSE_CODES.RESPONSE;
   packet.flags.AA = DNSCodes.AUTHORITATIVE_ANSWER_CODES.YES;
 
-  for (var fullname in services) {
-    addServiceToPacket(fullname, packet);
-  }
-
-  DNSSD.getAdvertisingSocket().then((socket) => {
-    var data = packet.serialize();
-    // socket.send(data, DNSSD_MULTICAST_GROUP, DNSSD_PORT);
-
-    let raw = new DataView(data);
-    let length =  raw.byteLength;
-    let buf = [];
-    for (let x = 0; x < length; x++) {
-      let charcode = raw.getUint8(x);
-      buf[x] = charcode;
+  utils.getIp().then((ip) => {
+    for (var fullname in services) {
+      addServiceToPacket(fullname, packet, ip);
     }
-    dump("KVKV: Sending data: " + JSON.stringify(buf) + "\n");
-    socket.send(DNSSD_MULTICAST_GROUP, DNSSD_PORT, buf, buf.length);
 
-    // Re-broadcast announcement after 1000ms (RFC6762, 8.3).
-    // setTimeout(() => {
-    //   socket.send(data, DNSSD_MULTICAST_GROUP, DNSSD_PORT);
-    // }, 1000);
-  }).catch((err) => {
-    dump("Caught error: " + err.toString() + "\n");
-    dump(err.stack + "\n");
+    DNSSD.getAdvertisingSocket().then((socket) => {
+      var data = packet.serialize();
+      // socket.send(data, DNSSD_MULTICAST_GROUP, DNSSD_PORT);
+
+      let raw = new DataView(data);
+      let length =  raw.byteLength;
+      let buf = [];
+      for (let x = 0; x < length; x++) {
+        let charcode = raw.getUint8(x);
+        buf[x] = charcode;
+      }
+      dump("KVKV: Sending data: " + JSON.stringify(buf) + "\n");
+      socket.send(DNSSD_MULTICAST_GROUP, DNSSD_PORT, buf, buf.length);
+
+      // Parse raw data from packet.
+      let parsed_packet = new DNSPacket(data);
+      dump("KVKV: Reparsed packet: " + JSON.stringify(parsed_packet) + "\n");
+
+      // Re-broadcast announcement after 1000ms (RFC6762, 8.3).
+      // setTimeout(() => {
+      //   socket.send(data, DNSSD_MULTICAST_GROUP, DNSSD_PORT);
+      // }, 1000);
+    }).catch((err) => {
+      dump("Caught error: " + err.toString() + "\n");
+      dump(err.stack + "\n");
+    });
   });
 }
 
-function addServiceToPacket(fullname, packet) {
+function addServiceToPacket(fullname, packet, ip) {
   var service = services[fullname];
   if (!service) {
     return;
@@ -245,6 +251,12 @@ function addServiceToPacket(fullname, packet) {
   srvRecord.setParsedData({priority,weight,port,target});
   packet.addRecord('AR', srvRecord);
 
+  // A record
+  var aRecord = new DNSResourceRecord(location,
+                                      DNSCodes.RECORD_TYPES.A);
+  aRecord.setParsedData({ip});
+  packet.addRecord('AR', aRecord);
+
   // TXT record
   let parts = [];
   for (let name in service.options) {
@@ -263,5 +275,7 @@ function addServiceToPacket(fullname, packet) {
 exports.startDiscovery = DNSSD.startDiscovery;
 exports.stopDiscovery = DNSSD.stopDiscovery;
 exports.registerService = DNSSD.registerService;
+exports.getIp = utils.getIp;
+exports.utils = utils;
 
 exports.PACKETS = PACKETS;

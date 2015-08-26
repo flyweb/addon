@@ -39,8 +39,7 @@ function nameToByteArray(name) {
   });
 
   byteArray.push(0x00);
-
-  return byteArray;
+  return byteArray.data;
 }
 
 function valueToFlags(value) {
