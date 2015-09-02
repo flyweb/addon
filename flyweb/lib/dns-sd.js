@@ -1,6 +1,6 @@
 var {Cc, Ci, Cu} = require("chrome");
 
-var utils = require("../utils");
+var utils = require("./utils");
 var {BinaryUtils} = require('./binary-utils');
 var {ByteArray} = require('./byte-array');
 var {DNSCodes} = require('./dns-codes');

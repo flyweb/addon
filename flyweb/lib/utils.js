@@ -11,6 +11,27 @@ function newUDPSocket(config) {
     return sock;
 }
 
+function newTCPServerSocket(config) {
+    let loopback = config.loopback || false;
+    let port = config.port || 0;
+    let backlog = config.backlog || -1;
+    let sock = Cc["@mozilla.org/network/server-socket;1"].createInstance(Ci.nsIServerSocket);
+    sock.init(port, loopback, backlog);
+    return sock;
+}
+
+function newBinaryInputStream(inputStream) {
+    let bis = Cc["@mozilla.org/binaryinputstream;1"].createInstance(Ci.nsIBinaryInputStream);
+    bis.setInputStream(inputStream);
+    return bis;
+}
+
+function newBinaryOutputStream(outputStream) {
+    let bos = Cc["@mozilla.org/binaryoutputstream;1"].createInstance(Ci.nsIBinaryOutputStream);
+    bos.setOutputStream(outputStream);
+    return bos;
+}
+
 function raiseError(err) {
     dump("!!! Exception raised: " + err.toString() + "\n");
     dump(err.stack + "\n");
@@ -62,6 +83,9 @@ function getIp() {
 
 exports.systemPrincipal = systemPrincipal;
 exports.newUDPSocket = newUDPSocket;
+exports.newTCPServerSocket = newTCPServerSocket;
+exports.newBinaryInputStream = newBinaryInputStream;
+exports.newBinaryOutputStream = newBinaryOutputStream;
 exports.raiseError = raiseError;
 exports.tryWrap = tryWrap;
 exports.getIp = getIp;
