@@ -32,20 +32,41 @@ function newBinaryOutputStream(outputStream) {
     return bos;
 }
 
-function raiseError(err) {
+function newThreadManager() {
+    return Cc["@mozilla.org/thread-manager;1"].createInstance(Ci.nsIThreadManager);
+}
+
+var ThreadManager;
+function currentThread() {
+    if (!ThreadManager)
+        ThreadManager = newThreadManager();
+    return ThreadManager.currentThread;
+}
+
+function dumpError(err) {
     dump("!!! Exception raised: " + err.toString() + "\n");
     dump(err.stack + "\n");
+}
+
+function raiseError(err) {
+    dumpError(err);
     throw err;
 }
 
 function tryWrap(fn) {
     try {
-        fn();
+        return fn();
     } catch(err) {
         dump("tryWrap ERROR: " + err.toString() + "\n");
         dump(err.stack + "\n");
         throw err;
     }
+}
+
+function tryWrapF(fn) {
+    return function (...args) {
+        return tryWrap(() => { fn.apply(null, args); });
+    };
 }
 
 function getIp() {
@@ -86,6 +107,10 @@ exports.newUDPSocket = newUDPSocket;
 exports.newTCPServerSocket = newTCPServerSocket;
 exports.newBinaryInputStream = newBinaryInputStream;
 exports.newBinaryOutputStream = newBinaryOutputStream;
+exports.newThreadManager = newThreadManager;
+exports.currentThread = currentThread;
+exports.dumpError = dumpError;
 exports.raiseError = raiseError;
 exports.tryWrap = tryWrap;
+exports.tryWrapF = tryWrapF;
 exports.getIp = getIp;

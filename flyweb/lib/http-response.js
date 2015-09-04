@@ -1,81 +1,61 @@
 'use strict';
 
+var {Ci,Cr} = require('chrome');
 var {EventTarget} = require('./event-target');
 var {BinaryUtils} = require('./binary-utils');
 var {HTTPStatus} = require('./http-status');
+var utils = require('./utils');
 
 var CRLF = '\r\n';
 var BUFFER_SIZE = 64 * 1024;
 
-function HTTPResponse(socket, timeout) {
-  this.socket  = socket;
-  this.timeout = timeout;
-
-  this.headers = {};
-  this.headers['Content-Type'] = 'text/html';
-  this.headers['Connection']   = 'close';
-
-  if (this.timeout) {
-    this.timeoutHandler = setTimeout(() => {
-      this.send(null, 500);
-    }, this.timeout);
-  }
+function HTTPResponse(transport) {
+  this.transport  = transport;
+  var outputStream = transport.openOutputStream(
+    Ci.nsITransport.OPEN_UNBUFFERED, 0, 0);
+  var asyncOutputStream = outputStream.QueryInterface(Ci.nsIAsyncOutputStream);
+  this.outputStream  = asyncOutputStream;
 }
 
 HTTPResponse.prototype = new EventTarget();
 
 HTTPResponse.prototype.constructor = HTTPResponse;
 
-HTTPResponse.prototype.send = function(body, status) {
-  return createResponse(body, status, this.headers, (response) => {
-    var offset = 0;
-    var remaining = response.byteLength;
+HTTPResponse.prototype.send = function(status, headers, body) {
+  let response = createResponse(status, headers, body);
+  let idx = 0;
 
-    var sendNextPart = () => {
-      var length = Math.min(remaining, BUFFER_SIZE);
+  let sendData = (stream) => {
+    dump("KVKV: outputStreamReady idx=" + idx + "/" + response.length + "!\n");
 
-      var bufferFull = this.socket.send(response, offset, length);
-
-      offset += length;
-      remaining -= length;
-
-      if (remaining > 0) {
-        if (!bufferFull) {
-          sendNextPart();
-        }
+    if (idx < response.length) {
+      let written;
+      try {
+        written = this.outputStream.write(response.substr(idx), response.length - idx);
+      } catch(err) {
+          utils.dumpError(error);
+          return;
       }
-      
-      else {
-        clearTimeout(this.timeoutHandler);
+      idx += written;
+      this.outputStream.asyncWait({
+        onOutputStreamReady: sendData
+      }, 0, 128, utils.currentThread());
 
-        this.socket.close();
-        this.dispatchEvent('complete');
+    } else {
+      dump("KVKV: closing!\n");
+      try {
+        this.outputStream.close();
+        this.transport.close(Cr.NS_OK);
+      } catch(err) {
+        utils.dumpError(err);
+        return;
       }
-    };
-
-    this.socket.ondrain = sendNextPart;
-
-    sendNextPart();
-  });
-};
-
-HTTPResponse.prototype.sendFile = function(fileOrPath, status) {
-  if (fileOrPath instanceof File) {
-    BinaryUtils.blobToArrayBuffer(fileOrPath, (arrayBuffer) => {
-      this.send(arrayBuffer, status);
-    });
-
-    return;
-  }
-
-  var xhr = new XMLHttpRequest();
-  xhr.open('GET', fileOrPath, true);
-  xhr.responseType = 'arraybuffer';
-  xhr.onload = () => {
-    this.send(xhr.response, status);
+    }
   };
 
-  xhr.send(null);
+  this.outputStream.asyncWait({
+    onOutputStreamReady: sendData
+  }, 0, 128, utils.currentThread());
 };
 
 function createResponseHeader(status, headers) {
@@ -88,20 +68,26 @@ function createResponseHeader(status, headers) {
   return header;
 }
 
-function createResponse(body, status, headers, callback) {
+function createResponse(status, headers, body) {
   body    = body    || '';
   status  = status  || 200;
   headers = headers || {};
 
-  headers['Content-Length'] = body.length || body.byteLength;
+  headers['Content-Length'] = body.length;
+  if (!headers['Content-Type'])
+    headers['Content-Type'] = "text/html";
 
-  var response = new Blob([
-    createResponseHeader(status, headers),
-    CRLF,
-    body
-  ]);
+  let header_string = createResponseHeader(status, headers);
+  let response_array = [header_string, CRLF];
 
-  return BinaryUtils.blobToArrayBuffer(response, callback);
+  if (typeof(body) === 'string') {
+    response_array.push(body);
+  } else {
+    for (let i = 0; i < body.length; i++)
+      response_array.push(String.fromCharCode(body[i]));
+  }
+
+  return response_array.join('');
 }
 
 exports.HTTPResponse = HTTPResponse;

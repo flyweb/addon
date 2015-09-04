@@ -42,35 +42,20 @@ HTTPServer.prototype.start = function() {
     onSocketAccepted: (sock, transport) => {
       this.transport = transport;
       dump("KVKV: Accepted new socket!\n");
-      var outputStream = transport.openOutputStream(
-                Ci.nsITransport.OPEN_UNBUFFERED, 0, 0);
+      utils.tryWrap(() => {
       var request = new HTTPRequest(transport);
+      request.addEventListener('complete', () => {
+        dump("KVKV: REQUEST COMPLETE!: " + JSON.stringify(request) + "\n");
+        var response = new HTTPResponse(transport);
+        request.response = response;
+      });
       this.request = request;
+      });
     },
 
     onStopListening: (sock, status) => {
     }
   });
-
-  /*
-  socket.onconnect = (connectEvent) => {
-    var request = new HTTPRequest(connectEvent);
-    
-    request.addEventListener('complete', () => {
-      var response = new HTTPResponse(connectEvent, this.timeout);
-
-      this.dispatchEvent('request', {
-        request: request,
-        response: response,
-        socket: connectEvent
-      });
-    });
-
-    request.addEventListener('error', () => {
-      console.warn('Invalid request received');
-    });
-  };
-  */
 
   this.socket = socket;
   this.running = true;

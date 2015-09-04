@@ -4,6 +4,8 @@
 
 var CRLF = '\r\n';
 
+var HTTPServer;
+
 var HTTPStatus = {};
 
 HTTPStatus.STATUS_CODES = {
@@ -58,6 +60,9 @@ HTTPStatus.STATUS_CODES = {
 };
 
 HTTPStatus.getStatusLine = function(status) {
+  if (!HTTPServer)
+    HTTPServer = require('./http-server').HTTPServer;
+
   var reason = HTTPStatus.STATUS_CODES[status] || 'Unknown';
 
   return [HTTPServer.HTTP_VERSION, status, reason].join(' ') + CRLF;

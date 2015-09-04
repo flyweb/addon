@@ -1,6 +1,5 @@
 'use strict';
 
-var {setTimeout, clearTimeout} = require("sdk/timers");
 var {Ci, Cr} = require("chrome");
 var utils = require('./utils');
 var {EventTarget} = require('./event-target');
@@ -20,34 +19,62 @@ function HTTPRequest(transport) {
  
   var inputStream = transport.openInputStream(
                 Ci.nsITransport.OPEN_UNBUFFERED, 0, 0);
+  var asyncInputStream = inputStream.QueryInterface(Ci.nsIAsyncInputStream);
   var binaryInputStream = utils.newBinaryInputStream(inputStream);
 
   this.transport = transport;
-  this.inputStream = inputStream;
-  this.binaryInputStream = binaryInputStream;
+  this.inputStream = asyncInputStream;
 
-  let TIMEOUT = 1000;
+  var readingHeader = true;
+  var readingBody = false;
 
-  /** Check for input every 25ms. */
-  var checkInput = () => {
-    // Check for available data.
-    var avail = inputStream.available();
-    if (avail > 0) {
-      // We may be at end of data, try to read more to raise error if so.
-      var data = binaryInputStream.readByteArray(avail);
-      for (var byte of data)
-        parts.push(byte);
-    }
+  var handler = (stream) => {
+    let avail = asyncInputStream.available();
+    let data;
+    if (avail > 0)
+      data = binaryInputStream.readByteArray(avail);
 
-    // Check for header.
-    if (tryParseHeader()) {
+    if (readingHeader) {
+      if (data) {
+        for (let byte of data)
+          parts.push(byte);
+      }
+
+      if (tryParseHeader()) {
+        if (readingBody) {
+          asyncInputStream.asyncWait({
+            onInputStreamReady: utils.tryWrapF(handler)
+          }, 0, 0, utils.currentThread());
+        }
         return;
+      }
+      asyncInputStream.asyncWait({
+        onInputStreamReady: utils.tryWrapF(handler)
+      }, 0, 0, utils.currentThread());
     }
 
-    // If still alive, schedule another check.
-    setTimeout(checkInput, TIMEOUT);
+    if (readingBody) {
+      if (data) {
+        for (let byte of data)
+          this.content.push(byte);
+      }
+
+      if (this.content.length >= this.contentLength) {
+        // Trim content down to specified length (if necessary)
+        while (this.content.length > this.contentLength)
+          this.content.pop();
+
+        // emit complete event.
+        this.complete = true;
+        this.dispatchEvent('complete', this);
+        return;
+      }
+    }
   };
-  setTimeout(checkInput, TIMEOUT);
+
+  asyncInputStream.asyncWait({
+    onInputStreamReady: utils.tryWrapF(handler)
+  }, 0, 0, utils.currentThread());
 
   var tryParseHeader = () => {
     let arr = new Uint8Array(parts);
@@ -55,50 +82,26 @@ function HTTPRequest(transport) {
     if (this.invalid) {
       transport.close(Cr.NS_OK);
       this.dispatchEvent('error', this);
+      readingHeader = false;
       return true;
     }
 
-    if (!resp) {
-        return false;
-    }
+    if (!resp)
+      return false;
 
     // Check content-length for body.
     var contentLength = parseInt(this.headers['Content-Length'], 10);
     if (isNaN(contentLength)) {
       this.complete = true;
       this.dispatchEvent('complete', this);
+      readingHeader = false;
       return true;
     }
 
     this.contentLength = contentLength;
-    setTimeout(readBody, TIMEOUT);
+    readingHeader = false;
+    readingBody = true;
     return true;
-  };
-
-  /** Check for input every 25ms. */
-  var readBody = () => {
-    // Check for available data.
-    var avail = inputStream.available();
-    if (avail > 0) {
-      // We may be at end of data, try to read more to raise error if so.
-      var data = binaryInputStream.readByteArray(avail);
-      for (var byte of data)
-        this.content.push(byte);
-    }
-
-    if (this.content.length >= this.contentLength) {
-        // Trim content down to specified length (if necessary)
-        while (this.content.length > this.contentLength)
-            this.content.pop();
-
-        // emit complete event.
-        this.complete = true;
-        this.dispatchEvent('complete', this);
-        return;
-    }
-
-    // If still alive, schedule another check.
-    setTimeout(readBody, TIMEOUT);
   };
 }
 
