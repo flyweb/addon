@@ -14,6 +14,8 @@ var {EventTarget} = require('./event-target');
 var {DiscoverRegistry} = require('./discover-registry');
 var {AdvertisedService,
      AdvertiseRegistry} = require('./advertise-registry');
+var {DiscoverListenerList,
+     DiscoverListener} = require('./discover-listener');
 
 /* The following was modified from https://github.com/justindarc/dns-sd.js */
 
@@ -22,8 +24,12 @@ var {AdvertisedService,
  */
 
 const DNSSD_SERVICE_NAME    = '_services._dns-sd._udp.local';
+
+// Actual mDNS port and group
 //const DNSSD_MULTICAST_GROUP = '224.0.0.251';
 //const DNSSD_PORT            = 5353;
+
+// Fake prototype mDNS port and group
 const DNSSD_MULTICAST_GROUP = '224.0.1.253';
 const DNSSD_PORT            = 6363;
 
@@ -32,6 +38,8 @@ var DNSSD = new EventTarget();
 var discovering = false;
 var discoverRegistry = new DiscoverRegistry();
 var advertiseRegistry = new AdvertiseRegistry();
+
+var discoverListeners = new DiscoverListenerList();
 
 DNSSD.getAdvertisingSocket = function() {
   return new Promise((resolve) => {
@@ -284,6 +292,7 @@ function handleResponsePacket(packet) {
   for (let svc of seenServices) {
     let svcInfo = discoverRegistry.serviceInfo(svc);
     dump("KVKV: Seen service " + svc + ": " + JSON.stringify(svcInfo) + "\n");
+    discoverListeners.found(svcInfo);
   }
 }
 
@@ -420,6 +429,7 @@ exports.startDiscovery = DNSSD.startDiscovery;
 exports.stopDiscovery = DNSSD.stopDiscovery;
 exports.registerService = DNSSD.registerService;
 exports.discoverRegistry = discoverRegistry;
+exports.discoverListeners = discoverListeners;
 exports.getIp = utils.getIp;
 exports.utils = utils;
 

@@ -93,11 +93,18 @@ DiscoverRegistry.prototype.serviceInfo = function(location) {
 
 
 function ServiceInfo({location, target, ip, port, txt}) {
-    this.location = location;
-    this.target = target;
-    this.ip = ip;
-    this.port = port;
-    this.txt = txt;
+  this.location = location;
+  this.target = target;
+  this.ip = ip;
+  this.port = port;
+  this.txt = txt;
+}
+
+ServiceInfo.prototype.equals = function (other) {
+  return (this.location == other.location) &&
+         (this.target == other.target) &&
+         (this.ip == other.ip) &&
+         (this.port == other.port);
 }
 
 exports.DiscoverRegistry = DiscoverRegistry;

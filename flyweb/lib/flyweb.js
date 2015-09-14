@@ -8,7 +8,8 @@ var categoryManager = Cc["@mozilla.org/categorymanager;1"]
 
 var contractId = '@mozilla.org/flyweb;1';
 
-var dnsSD = require('./dns-sd');
+var DNSSD = require('./dns-sd');
+var API = require('./api');
 var {HTTPServer} = require('./http-server');
 
 var FlyWeb = Class({
@@ -26,13 +27,11 @@ var FlyWeb = Class({
         return eval(string);
       },
 
-      dns_sd: dnsSD,
+      dns_sd: DNSSD,
       HTTPServer: HTTPServer,
 
-      __exposedProps__: {
-        hello: 'r',
-        ev: 'r',
-        dns_sd: 'r'
+      discoverNearbyServices: function(spec) {
+        return API.discoverNearbyServices(spec);
       }
     };
   }
@@ -51,4 +50,3 @@ var wrapper = Cc[contractId].createInstance(Ci.nsISupports);
 
 categoryManager.deleteCategoryEntry("JavaScript-navigator-property", contractId, false);
 categoryManager.addCategoryEntry("JavaScript-navigator-property", "flyweb", contractId, false, true);
-
