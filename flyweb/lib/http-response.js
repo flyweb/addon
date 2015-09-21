@@ -22,40 +22,45 @@ HTTPResponse.prototype = new EventTarget();
 HTTPResponse.prototype.constructor = HTTPResponse;
 
 HTTPResponse.prototype.send = function(status, headers, body) {
-  let response = createResponse(status, headers, body);
-  let idx = 0;
-
-  let sendData = (stream) => {
-    dump("KVKV: outputStreamReady idx=" + idx + "/" + response.length + "!\n");
-
-    if (idx < response.length) {
-      let written;
-      try {
-        written = this.outputStream.write(response.substr(idx), response.length - idx);
-      } catch(err) {
-          utils.dumpError(error);
+  return new Promise((resolve, reject) => {
+    let response = createResponse(status, headers, body);
+    let idx = 0;
+  
+    let sendData = (stream) => {
+      dump("KVKV: outputStreamReady idx=" + idx + "/" + response.length + "!\n");
+  
+      if (idx < response.length) {
+        let written;
+        try {
+          written = this.outputStream.write(response.substr(idx), response.length - idx);
+        } catch(err) {
+            utils.dumpError(err);
+            reject(err);
+            return;
+        }
+        idx += written;
+        this.outputStream.asyncWait({
+          onOutputStreamReady: sendData
+        }, 0, 128, utils.currentThread());
+  
+      } else {
+        dump("KVKV: closing!\n");
+        try {
+          this.outputStream.close();
+          this.transport.close(Cr.NS_OK);
+          resolve();
+        } catch(err) {
+          utils.dumpError(err);
+          reject(err);
           return;
+        }
       }
-      idx += written;
-      this.outputStream.asyncWait({
-        onOutputStreamReady: sendData
-      }, 0, 128, utils.currentThread());
-
-    } else {
-      dump("KVKV: closing!\n");
-      try {
-        this.outputStream.close();
-        this.transport.close(Cr.NS_OK);
-      } catch(err) {
-        utils.dumpError(err);
-        return;
-      }
-    }
-  };
-
-  this.outputStream.asyncWait({
-    onOutputStreamReady: sendData
-  }, 0, 128, utils.currentThread());
+    };
+  
+    this.outputStream.asyncWait({
+      onOutputStreamReady: sendData
+    }, 0, 128, utils.currentThread());
+  });
 };
 
 function createResponseHeader(status, headers) {

@@ -42,14 +42,12 @@ HTTPServer.prototype.start = function() {
     onSocketAccepted: (sock, transport) => {
       this.transport = transport;
       dump("KVKV: Accepted new socket!\n");
-      utils.tryWrap(() => {
       var request = new HTTPRequest(transport);
       request.addEventListener('complete', () => {
         dump("KVKV: REQUEST COMPLETE!: " + JSON.stringify(request) + "\n");
         var response = new HTTPResponse(transport);
-        request.response = response;
-      });
-      this.request = request;
+        if (this.onrequest)
+          this.onrequest(request, response);
       });
     },
 

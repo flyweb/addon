@@ -32,6 +32,9 @@ var FlyWeb = Class({
 
       discoverNearbyServices: function(spec) {
         return API.discoverNearbyServices(spec);
+      },
+      publishServer: function(name, config) {
+        return API.publishServer(name, config);
       }
     };
   }

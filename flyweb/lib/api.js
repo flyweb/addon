@@ -1,6 +1,9 @@
 
 var DNSSD = require('./dns-sd');
+var {HTTPServer} = require('./http-server');
+var {HTTPStatus} = require('./http-status');
 var utils = require('./utils');
+var uuid = require('sdk/util/uuid');
 
 function discoverNearbyServices(spec) {
   return new Promise((resolve, reject) => {
@@ -13,7 +16,7 @@ function discoverNearbyServices(spec) {
         }
     });
     service_wrapper = makeFlyWebServices(listener_id);
-    DNSSD.startDiscovery('_afpovertcp._tcp.local');
+    DNSSD.startDiscovery('_flyweb._tcp.local');
     resolve(service_wrapper.iface);
   });
 }
@@ -106,7 +109,6 @@ function makeFlyWebServices(listenerId) {
 }
 
 function makeFlyWebService(serviceId, svc) {
-
   let service = svc;
   let service_iface = Object.create(null);
   service_iface.onavailable = null;
@@ -125,8 +127,7 @@ function makeFlyWebService(serviceId, svc) {
         let url = "http://" + service.ip + ":" + service.port;
         if (service_config.path)
             url += "/" + service_config.path;
-        let server_handle = makeFlyWebServerHandle(session_id, url);
-        resolve(server_handle.iface);
+        makeFlyWebServerHandle(session_id, url, resolve);
       });
     }
   });
@@ -149,7 +150,7 @@ function makeFlyWebService(serviceId, svc) {
   }
 }
 
-function makeFlyWebServerHandle(sessionId, url) {
+function makeFlyWebServerHandle(sessionId, url, resolve) {
   let handle_iface = Object.create(null);
   handle_iface.ondisconnect = null;
   Object.defineProperty(handle_iface, 'sessionId', {value: sessionId});
@@ -159,7 +160,63 @@ function makeFlyWebServerHandle(sessionId, url) {
       return new Promise.resolve();
     }
   });
+  resolve(handle_iface);
   return {iface:handle_iface};
 }
 
+
+function publishServer(name, config) {
+  return new Promise((resolve, reject) => {
+    // Create and start a new HTTP server, get port.
+    let httpServer = new HTTPServer();
+    httpServer.start();
+    let port = httpServer.port;
+
+    // Advertise it and return from the promise.
+    let server_wrapper = makeFlyWebPublishedServer({name, config, httpServer});
+    resolve(server_wrapper.iface);
+  });
+}
+
+function makeFlyWebPublishedServer({name, config, httpServer}) {
+  // Copy config into options
+  let options = Object.create(null);
+  for (let key in config) {
+    options[key] = '' + config[key];
+  }
+  Object.freeze(options);
+
+  // Request handler.
+  httpServer.onrequest = function (request, response) {
+    published_server_impl.request(request, response);
+  };
+
+  DNSSD.registerService("_flyweb._tcp.local", name, httpServer.port, config);
+
+  let published_server_iface = Object.create(null);
+  Object.defineProperty(published_server_iface, 'onrequest', { value: null, writable:true });
+  Object.defineProperty(published_server_iface, 'name', { get: () => name });
+  Object.defineProperty(published_server_iface, 'config', { get: () => options });
+  Object.defineProperty(published_server_iface, 'stop', { value: () => {
+    published_server_impl.stop();
+  }});
+
+  var published_server_impl = {
+    request: (req, resp) => {
+        if (published_server_iface.onrequest) {
+            utils.suppressError(() => { published_server_iface.onrequest(req, resp); });
+        }
+    },
+    stop: () => {
+        return new Promise((resolve, reject) => {
+            httpServer.stop();
+            resolve();
+        });
+    }
+  };
+
+  return {iface:published_server_iface, impl:published_server_impl};
+}
+
 exports.discoverNearbyServices = discoverNearbyServices;
+exports.publishServer = publishServer;

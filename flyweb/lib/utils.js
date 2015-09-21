@@ -69,6 +69,15 @@ function tryWrapF(fn) {
     };
 }
 
+function suppressError(fn) {
+    try {
+        return fn();
+    } catch(err) {
+        dump("suppressError ERROR: " + err.toString() + "\n");
+        dump(err.stack + "\n");
+    }
+}
+
 function getIp() {
   return new Promise((resolve, reject) => {
     let receiver = newUDPSocket({localPort: 0, loopback: false});
@@ -113,4 +122,5 @@ exports.dumpError = dumpError;
 exports.raiseError = raiseError;
 exports.tryWrap = tryWrap;
 exports.tryWrapF = tryWrapF;
+exports.suppressError = suppressError;
 exports.getIp = getIp;
