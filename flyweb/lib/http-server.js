@@ -12,7 +12,7 @@ var DEFAULT_TIMEOUT = 20000;
 var CRLF = '\r\n';
 
 function HTTPServer(port, options) {
-  this.port = port || DEFAULT_PORT;
+  this.port = port;
 
   options = options || {};
   for (var option in options) {

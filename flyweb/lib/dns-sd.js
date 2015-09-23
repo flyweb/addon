@@ -106,15 +106,18 @@ DNSSD.stopDiscovery = function() {
 };
 
 DNSSD.registerService = function(serviceName, name, port, options) {
-  advertiseRegistry.addService(new AdvertisedService({
+  let svc = new AdvertisedService({
     serviceName: serviceName,
     name: name,
     port: port || 0,
     options: options || {}
-  }));
+  });
+  advertiseRegistry.addService(svc);
 
   // Broadcast advertisement of registered services.
   advertise();
+
+  return svc;
 };
 
 DNSSD.unregisterService = function(fullname) {
