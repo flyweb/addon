@@ -54,11 +54,15 @@ function discoverNearbyServices(worker, obj, responseCallback) {
         (service, found) => {
             if (found) {
                 dump("KVKV HERE1\n");
+                try {
                 worker.port.emit('message', JSON.stringify({
                     messageName: 'serviceFound',
                     messageId: serviceListId,
                     service: service
                 }));
+                } catch(err) {
+                    dump("KVKV HERE1.5: " + err.message + "\n" + err.stack + "\n");
+                }
                 dump("KVKV HERE2\n");
             } else {
                 worker.port.emit('message', JSON.stringify({

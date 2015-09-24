@@ -119,6 +119,9 @@ function discoverNearbyServices(spec) {
                     return;
                 }
 
+                let onservicefound = null;
+                let onservicelost = null;
+
                 // Handle response.
                 let {serviceListId} = resp;
                 let services = [];
@@ -150,8 +153,13 @@ function discoverNearbyServices(spec) {
                             }
                         );
                     },
-                    onservicefound: null,
-                    onservicelost: null
+                    onservicefound: function (callback) {
+                        dump("CONTENT HANDLER setting onservicefound\n");
+                        onservicefound = callback;
+                    },
+                    onservicelost: function (callback) {
+                        onservicelost = callback;
+                    },
                 });
 
                 AddHandler("serviceFound", serviceListId, message => {
@@ -161,12 +169,14 @@ function discoverNearbyServices(spec) {
                     let descriptor = addGlobalService(service);
                     let {serviceId} = descriptor;
                     services.push(descriptor);
-                    if (result.onservicefound) {
+                    dump("CONTENT HANDLER serviceFound: dispatching\n");
+                    if (onservicefound) {
+                        dump("CONTENT HANDLER serviceFound: have onservicefound\n");
                         try {
-                            result.onservicefound(CI({serviceId}));
+                            onservicefound(CI({serviceId}));
                         } catch(err) {
                             dump("Error calling page onservicefound: "
-                                    + err.stack + "\n");
+                                    + err.message + "\n" + err.stack + "\n");
                         }
                     }
                 });
