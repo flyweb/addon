@@ -255,6 +255,8 @@ function publishServer(name, options) {
                      JSON.stringify(resp) + "\n");
                 let {httpServerId} = resp;
 
+                let onrequest = null;
+
                 let result = CI({
                     name, options,
                     stop: function () {
@@ -263,7 +265,9 @@ function publishServer(name, options) {
                                  JSON.stringify(resp) + "\n");
                         });
                     },
-                    onrequest: null
+                    onrequest: function (callback) {
+                        onrequest = callback;
+                    }
                 });
 
                 AddHandler("httpRequest", httpServerId, message => {
@@ -281,9 +285,9 @@ function publishServer(name, options) {
                             }
                         );
                     }
-                    if (result.onrequest) {
+                    if (onrequest) {
                         try {
-                            result.onrequest(CI({
+                            onrequest(CI({
                                 method, path, params, headers, content,
                                 sendResponse
                             }));

@@ -29,7 +29,7 @@ function clientDiscover() {
         });
 
         for (var i = 0; i < svcs.length; i++) {
-            var svc = svcs.getService(i);
+            var svc = svcs.get(i);
             console.log("clientDiscover: saw service: " + svc.id);
             addClientService(svc);
         }
@@ -82,4 +82,38 @@ function renderClientService(svc, outArray) {
         '</div>',
         '<br />'
     ].join('\n');
+}
+
+var WORDS = ["candy", "james", "pool", "singalong",
+             "able", "pine", "tree", "clarity", "star",
+             "ice", "sky", "pluto", "kind", "stock",
+             "lift", "poppy"];
+function generateServerName() {
+    // Generate a random server name.
+    var arr = [];
+    for (var i = 0; i < 2; i++) {
+        arr.push(WORDS[(Math.random() * WORDS.length)|0]);
+    }
+    return arr.join("_");
+}
+
+var ServerName = null;
+function initServer() {
+    ServerName = generateServerName();
+    var serverNameElem = document.getElementById("server-name");
+    serverNameElem.innerHTML = ServerName;
+}
+
+function startServer() {
+    if (!ServerName)
+        initServer();
+
+    navigator.publishServer(ServerName, {}).then(server => {
+        console.log("Published server: " + JSON.stringify(server));
+        server.onrequest(requestEvent => {
+            requestEvent.sendResponse(200, {"Content-Type": "text/html"},
+                        "<html><head><title>AAAAAAAAAHAHAHAHAHAHAH!!!!!!</title></head><body><h1>BOOYEAH</h1></body></html>");
+            console.log("GOT REQUEST: ", requestEvent);
+        });
+    });
 }

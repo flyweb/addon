@@ -1,0 +1,26 @@
+<html>
+
+<head>
+<title>FlyWeb Hello World - Server</title>
+<script type="text/javascript" src="hello-world.js"></script>
+<link href="hello-world.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body onload="initServer()">
+    <h1><span class="flyweb-emblem">[Fly Web]</span> Hello World Server</h1>
+    <div style="border: 2px solid black; margin:1em; padding:0.5em;">
+        <span style="font-weight: bolder;">Server name:</span>
+        <span id="server-name"></span>
+    </div>
+    <br />
+    <div class="button" onclick="startServer()">
+        Start Server
+    </div>
+    <br />
+    <input type="text" id="sendText" />
+    <br />
+    <div id="server-log">
+    </div>
+</body>
+
+</html>
