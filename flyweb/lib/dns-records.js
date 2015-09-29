@@ -79,6 +79,7 @@ DNSResourceRecord.prototype.parseData = function (packetData, offset) {
     let ip = parts.join('.');
     this.parsedData = {ip};
   }
+  delete this.data;
 };
 
 DNSResourceRecord.prototype.setParsedData = function (obj) {

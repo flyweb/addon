@@ -164,16 +164,17 @@ function handleQueryPacket(packet, message) {
 
 function respondToPtrQuery(query, message) {
   dump("KVKV: Respond to PTR Query: " + JSON.stringify(query) + "\n");
-  for (let fullname of advertiseRegistry.names()) {
+  advertiseRegistry.names().forEach(fullname => {
     let svc = advertiseRegistry.getService(fullname);
     if (svc.serviceName == query.name) {
       // Respond to query.
-      var packet = new DNSPacket();
-      packet.flags.QR = DNSCodes.QUERY_RESPONSE_CODES.RESPONSE;
-      packet.flags.AA = DNSCodes.AUTHORITATIVE_ANSWER_CODES.YES;
       utils.getIp().then((ip) => {
         DNSSD.getAdvertisingSocket().then((socket) => {
+          let packet = new DNSPacket();
+          packet.flags.QR = DNSCodes.QUERY_RESPONSE_CODES.RESPONSE;
+          packet.flags.AA = DNSCodes.AUTHORITATIVE_ANSWER_CODES.YES;
           let target = message.fromAddr;
+          dump("KVKV: Sending service: " + JSON.stringify(svc) + "\n");
           packet.addRecord('QD', query);
           addPtrRecord(svc, packet, 'AN');
           addSrvRecord(svc, packet, 'AR');
@@ -189,7 +190,7 @@ function respondToPtrQuery(query, message) {
         dump(err.stack + "\n");
       });
     }
-  }
+  });
 }
 
 function respondToSrvQuery(query, message) {
@@ -352,6 +353,7 @@ function advertiseService(fullname, socket, ip) {
   let svc = advertiseRegistry.getService(fullname);
   if (!svc)
     return;
+  dump("KVKV: advertiseService " + JSON.stringify(svc) + "\n");
 
   var packet = new DNSPacket();
 
@@ -376,12 +378,11 @@ function sendPacket(packet, socket, targetip, port) {
     let charcode = raw.getUint8(x);
     buf[x] = charcode;
   }
-  dump("KVKV: Sending data to (" + targetip + ":" + port + "): " + JSON.stringify(buf) + "\n");
   socket.send(targetip, port, buf, buf.length);
 
   // Parse raw data from packet.
   let parsed_packet = new DNSPacket(data);
-  dump("KVKV: Reparsed packet: " + JSON.stringify(parsed_packet) + "\n");
+  dump("KVKV: Sent packet: " + JSON.stringify(parsed_packet) + "\n");
 }
 
 function addServiceToPacket(svc, packet, ip) {
