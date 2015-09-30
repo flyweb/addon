@@ -19,6 +19,9 @@ var FlyWebServices = [];
 var FlyWebConnection = null;
 
 function clientDiscover() {
+    // Clear out FlyWebServices list.
+    FlyWebServices = [];
+
     var stopOldDiscovery;
     if (CurrentDiscoverList) {
         stopOldDiscovery = CurrentDiscoverList.stopDiscovery();
