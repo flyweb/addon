@@ -13,24 +13,36 @@ function runClient() {
 }
 
 
+var CurrentDiscoverList = null;
+
 var FlyWebServices = [];
 var FlyWebConnection = null;
 
 function clientDiscover() {
-    navigator.discoverNearbyServices().then(svcs => {
+    var stopOldDiscovery;
+    if (CurrentDiscoverList) {
+        stopOldDiscovery = CurrentDiscoverList.stopDiscovery();
+        CurrenetDiscoverList = null;
+    } else {
+        stopOldDiscovery = Promise.resolve();
+    }
+    stopOldDiscovery.then(() => {
+        return navigator.discoverNearbyServices()
+    }).then(svcs => {
+        CurrentDiscoverList = svcs;
         console.log("clientDiscover got services!");
 
         svcs.onservicefound(function (event) {
-            console.log("clientDiscover: onservicefound: " + event.serviceId);
+            console.log("clientDiscover: onservicefound: ", event.serviceId);
             var svc = svcs.get(event.serviceId);
-            console.log("clientDiscover: service: " + JSON.stringify(svc));
+            console.log("clientDiscover: service: ", svc);
             addClientService(svc);
             renderClientServiceList();
         });
 
         for (var i = 0; i < svcs.length; i++) {
             var svc = svcs.get(i);
-            console.log("clientDiscover: saw service: " + svc.id);
+            console.log("clientDiscover: saw service: ", svc);
             addClientService(svc);
         }
         renderClientServiceList();
