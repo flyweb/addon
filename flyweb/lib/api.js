@@ -9,7 +9,7 @@ function dispatchRequest(worker, name, obj, responseCallback) {
     let func;
     if (name == "discoverNearbyServices") {
         func = discoverNearbyServices;
-    } if (name == "stopDiscovery") {
+    } else if (name == "stopDiscovery") {
         func = stopDiscovery;
     } else if (name == "publishServer") {
         func = publishServer;
@@ -20,12 +20,14 @@ function dispatchRequest(worker, name, obj, responseCallback) {
     } else {
         dump("dispatchMessage: unhandled name " + name +
              " (" + JSON.stringify(obj) + ")\n");
+        return;
     }
 
     try {
         func(worker, obj, responseCallback);
     } catch(err) {
-        dump("KVKV dispatch " + name + "failed: " + err.stack + "\n");
+        dump("[FlyWeb-Addon] dispatchRequest '" + name + "' failed: " +
+                err.stack + "\n");
         responseCallback({error:err.stack});
     }
 }
@@ -50,20 +52,24 @@ var ServiceLists = {};
 function discoverNearbyServices(worker, obj, responseCallback) {
     let spec = obj.spec;
     let serviceListId = newServiceListId();
+    let debugPrefix = "[FlyWeb-Addon] discoverNearbyServices" +
+                      "[" + serviceListId + "]";
+    dump(debugPrefix + " Create\n")
     let listenerId = DNSSD.discoverListeners.addListener(spec,
         (service, found) => {
             if (found) {
-                dump("KVKV HERE1\n");
+                dump(debugPrefix + " Found service: " +
+                        JSON.stringify(service) + "\n")
                 try {
-                worker.port.emit('message', JSON.stringify({
-                    messageName: 'serviceFound',
-                    messageId: serviceListId,
-                    service: service
-                }));
+                    worker.port.emit('message', JSON.stringify({
+                        messageName: 'serviceFound',
+                        messageId: serviceListId,
+                        service: service
+                    }));
                 } catch(err) {
-                    dump("KVKV HERE1.5: " + err.message + "\n" + err.stack + "\n");
+                    dump("Error emitting serviceFounc message: "
+                        + err.message + "\n" + err.stack + "\n");
                 }
-                dump("KVKV HERE2\n");
             } else {
                 worker.port.emit('message', JSON.stringify({
                     messageName: 'serviceLost',
@@ -80,8 +86,12 @@ function discoverNearbyServices(worker, obj, responseCallback) {
 
 function stopDiscovery(worker, obj, responseCallback) {
     let {serviceListId} = obj;
+    let debugPrefix = "[FlyWeb-Addon] stopDiscovery[" + serviceListId + "]";
+    dump(debugPrefix + " Checking\n");
     if (ServiceLists[serviceListId]) {
-        let {listenerId} = ServiceLists[serviceListId];
+        let svcList = ServiceLists[serviceListId];
+        dump(debugPrefix + " Found " + JSON.stringify(svcList) + "\n");
+        let {listenerId} = svcList;
         DNSSD.discoverListeners.removeListener(listenerId);
         delete ServiceLists[serviceListId];
     }

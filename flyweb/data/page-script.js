@@ -141,17 +141,16 @@ function discoverNearbyServices(spec) {
                         }
                     },
                     stopDiscovery: function () {
-                        SendRequest("stopDiscovery", {serviceListId},
-                            resp => {
-                                return new window.Promise(
-                                    XF((resolve, reject) => {
-                                        if (resp.error)
-                                            reject(resp.error);
-                                        else
-                                            resolve();
-                                    }));
-                            }
-                        );
+                        return new window.Promise(XF((resolve, reject) => {
+                            SendRequest("stopDiscovery", {serviceListId},
+                                resp => {
+                                    if (resp.error)
+                                        reject(resp.error);
+                                    else
+                                        resolve();
+                                }
+                            );
+                        }));
                     },
                     onservicefound: function (callback) {
                         dump("CONTENT HANDLER setting onservicefound\n");

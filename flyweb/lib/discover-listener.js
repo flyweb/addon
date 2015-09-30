@@ -14,7 +14,6 @@ class DiscoverListenerList
 
   addListener(spec, callback)  {
     let id = this.nextId();
-    dump("KVKV: Adding listener (id:" + id + ") for spec(" + spec + ")\n");
     let listener = new DiscoverListener({id, spec, callback});
     this.listeners_.push(listener);
     return id;
@@ -22,12 +21,11 @@ class DiscoverListenerList
 
   removeListener(id) {
     this.listeners_ = this.listeners_.filter((listener) => {
-      return listener.id == id;
+      return listener.id != id;
     });
   }
 
   found(service) {
-    dump("KVKV: Found service, calling listeners: " + JSON.stringify(service) + "\n");
     for (let listener of this.listeners_)
       listener.found(service);
   }
@@ -55,11 +53,8 @@ class DiscoverListener
   }
 
   found(service) {
-    dump("KVKV: Listener " + this.id_ + " found service: " + JSON.stringify(service) + "\n");
-    if (this.callback_ && this.match_(service)) {
-      dump("KVKV: Listener " + this.id_ + " calling callback!\n");
+    if (this.callback_ && this.match_(service))
       this.callback_(service, true)
-    }
   }
 
   lost(service) {
