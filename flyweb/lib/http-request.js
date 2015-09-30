@@ -29,11 +29,27 @@ function HTTPRequest(transport) {
   var readingBody = false;
 
   var handler = (stream) => {
-    let avail = asyncInputStream.available();
-    let data;
-    if (avail > 0)
-      data = binaryInputStream.readByteArray(avail);
+    let avail;
+    try { avail = asyncInputStream.available(); }
+    catch (err) {
+        // Closed stream.
+        return;
+    }
 
+    if (avail == 0) {
+        // Stream is finished.
+        return;
+    }
+
+    // If we're neither reading the header nor the body,
+    // not sure what's going on.
+    if (!readingHeader && !readingBody) {
+        dump("[FlyWeb-HTTPRequest] Incoming when reading " +
+             "neither header nor body.");
+        return;
+    }
+
+    let data = binaryInputStream.readByteArray(avail);
     if (readingHeader) {
       if (data) {
         for (let byte of data)
@@ -51,12 +67,17 @@ function HTTPRequest(transport) {
       asyncInputStream.asyncWait({
         onInputStreamReady: utils.tryWrapF(handler)
       }, 0, 0, utils.currentThread());
+      return;
     }
 
     if (readingBody) {
       if (data) {
-        for (let byte of data)
+        let dataArray = [];
+        for (let byte of data) {
+          dataArray.push(byte);
           this.content.push(byte);
+        }
+        this.dispatchEvent('requestData', dataArray);
       }
 
       if (this.content.length >= this.contentLength) {
@@ -93,14 +114,16 @@ function HTTPRequest(transport) {
     var contentLength = parseInt(this.headers['Content-Length'], 10);
     if (isNaN(contentLength)) {
       this.complete = true;
-      this.dispatchEvent('complete', this);
       readingHeader = false;
+      this.dispatchEvent('headerComplete', this);
+      this.dispatchEvent('complete', this);
       return true;
     }
 
     this.contentLength = contentLength;
     readingHeader = false;
     readingBody = true;
+    this.dispatchEvent('headerComplete', this);
     return true;
   };
 }
