@@ -49,7 +49,7 @@ function HandleMessage(kind, message) {
     let subHandlers = Handlers[messageName];
     if (!(messageId in subHandlers)) {
         dump("  No handler for " + kind + " id!? (" + messageName + "." +
-                obj.messageId + ")\n");
+                messageId + ")\n");
         return;
     }
     let {handler} = subHandlers[messageId];
@@ -232,6 +232,12 @@ function publishServer(name, options) {
                 return;
             }
 
+            let rawRequest = false;
+            if (options.rawRequest) {
+                let {rawRequest} = options;
+                delete options.rawRequest;
+            }
+
             let localOptions = {};
             for (let opt in options) {
                 localOptions[opt] = options[opt];
@@ -254,8 +260,7 @@ function publishServer(name, options) {
                 });
 
                 AddHandler("httpRequest", httpServerId, message => {
-                    let {httpRequestId, method, path,
-                         params, headers, content} = message;
+                    let {httpRequestId} = message;
 
                     function sendResponse(status, headers, body) {
                         SendRequest("httpResponse", {httpRequestId, status,
@@ -313,12 +318,55 @@ function publishServer(name, options) {
                         );
                       }));
                     }
+
+                    var bufferedData = null;
+                    var ondata = null;
+                    function setondata(callback) {
+                        ondata = callback;
+                        if (bufferedData) {
+                            try { ondata(CI(bufferedData)); }
+                            finally { bufferedData = []; }
+                        }
+                    }
+
+                    var complete = false;
+                    var oncomplete = null;
+                    function setoncomplete(callback) {
+                        oncomplete = callback;
+                        if (complete) {
+                            oncomplete();
+                        }
+                    }
+
+                    if (rawRequest) {
+                        AddHandler("httpRequestData", httpRequestId, message => {
+                            if (ondata)
+                                ondata(message.data);
+                            else
+                                bufferedData = message.data;
+                        });
+                        AddHandler("httpRequestComplete", httpRequestId, message => {
+                            if (oncomplete)
+                                oncomplete();
+                            else
+                                complete = true;
+                        });
+                    }
+
                     if (onrequest) {
                         try {
-                            onrequest(CI({
-                                method, path, params, headers, content,
-                                sendResponse, stream: sendResponseStream
-                            }));
+                            if (rawRequest) {
+                                onrequest(CI({
+                                    sendResponse, stream: sendResponseStream,
+                                    ondata: setondata, oncomplete: setoncomplete
+                                }));
+                            } else {
+                                let {method, path, params, headers, content} = message;
+                                onrequest(CI({
+                                    method, path, params, headers, content,
+                                    sendResponse, stream: sendResponseStream
+                                }));
+                            }
                         } catch(err) {
                             dump("Error calling page onrequest: " + err.message + "\n"
                                     + err.stack + "\n");

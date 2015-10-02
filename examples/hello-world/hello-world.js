@@ -124,9 +124,14 @@ function startServer() {
     if (!ServerName)
         initServer();
 
-    navigator.publishServer(ServerName, {}).then(server => {
+    navigator.publishServer(ServerName).then(server => {
         console.log("Published server: " + JSON.stringify(server));
         server.onrequest(requestEvent => {
+            /*
+            requestEvent.ondata(data => {
+                console.log("SERVER GOT DATA: ", data);
+            });
+            */
             var method = requestEvent.method;
             var path = requestEvent.path;
             console.log("Got " + method + " request for " + path);

@@ -118,9 +118,11 @@ var HTTPRequests = {};
 function publishServer(worker, obj, responseCallback) {
     let httpServerId = newHTTPServerId();
     let {name,options} = obj;
+    let {rawRequest} = options;
+    let serverOpts = {rawRequest};
 
     // Create and start a new HTTP server, get port.
-    let httpServer = new HTTPServer();
+    let httpServer = new HTTPServer(undefined, serverOpts);
     httpServer.start();
     let {port} = httpServer;
 
@@ -129,13 +131,34 @@ function publishServer(worker, obj, responseCallback) {
     httpServer.onrequest = (request, response) => {
         let httpRequestId = newHTTPRequestId();
         HTTPRequests[httpRequestId] = {httpRequestId, request, response};
-        let {method, path, params, headers, content} = request;
 
-        worker.port.emit("message", JSON.stringify({
-            messageName: "httpRequest",
-            messageId: httpServerId,
-            httpRequestId, method, path, params, headers, content
-        }));
+        if (rawRequest) {
+            request.addEventListener('data', (data) => {
+                worker.port.emit("message", JSON.stringify({
+                    messageName: "httpRequestData",
+                    messageId: httpRequestId,
+                    data: data
+                }));
+            });
+            request.addEventListener('complete', () => {
+                worker.port.emit("message", JSON.stringify({
+                    messageName: "httpRequestComplete",
+                    messageId: httpRequestId
+                }));
+            });
+            worker.port.emit("message", JSON.stringify({
+                messageName: "httpRequest",
+                messageId: httpServerId,
+                httpRequestId
+            }));
+        } else {
+            let {method, path, params, headers, content} = request;
+            worker.port.emit("message", JSON.stringify({
+                messageName: "httpRequest",
+                messageId: httpServerId,
+                httpRequestId, method, path, params, headers, content
+            }));
+        }
     };
 
     let service = DNSSD.registerService("_flyweb._tcp.local", name, port,

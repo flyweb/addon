@@ -12,7 +12,6 @@ var CRLFx2 = CRLF + CRLF;
 
 function HTTPRequest(transport, options) {
   options = options || {};
-
   if (!HTTPServer)
     HTTPServer = require('./http-server').HTTPServer;
  
@@ -34,6 +33,37 @@ function HTTPRequest(transport, options) {
 }
 HTTPRequest.prototype = new EventTarget();
 HTTPRequest.prototype.constructor = HTTPRequest;
+
+HTTPRequest.prototype.waitForData = function (handler) {
+    this.asyncInputStream.asyncWait({
+        onInputStreamReady: utils.tryWrapF(handler)
+    }, 0, 0, utils.currentThread());
+};
+
+HTTPRequest.prototype.receiveRaw = function () {
+  var buffer = [];
+
+  var handler = (stream) => {
+    let avail;
+    try { avail = this.asyncInputStream.available(); }
+    catch (err) { /* closed stream. */ return; }
+
+    // Check if stream is finished.
+    if (avail == 0) {
+        this.dispatchEvent('complete');
+        return;
+    }
+
+    let data = this.binaryInputStream.readByteArray(avail);
+    let array = [];
+    for (let byte of data)
+        array.push(byte);
+    this.dispatchEvent('data', array);
+    this.waitForData(handler);
+  };
+
+  this.waitForData(handler);
+};
 
 HTTPRequest.prototype.receiveParsed = function () {
   var parts = [];
@@ -69,16 +99,11 @@ HTTPRequest.prototype.receiveParsed = function () {
       }
 
       if (tryParseHeader()) {
-        if (readingBody) {
-          this.asyncInputStream.asyncWait({
-            onInputStreamReady: utils.tryWrapF(handler)
-          }, 0, 0, utils.currentThread());
-        }
+        if (readingBody)
+          this.waitForData(handler);
         return;
       }
-      this.asyncInputStream.asyncWait({
-        onInputStreamReady: utils.tryWrapF(handler)
-      }, 0, 0, utils.currentThread());
+      this.waitForData(handler);
       return;
     }
 
@@ -105,9 +130,7 @@ HTTPRequest.prototype.receiveParsed = function () {
     }
   };
 
-  this.asyncInputStream.asyncWait({
-    onInputStreamReady: utils.tryWrapF(handler)
-  }, 0, 0, utils.currentThread());
+  this.waitForData(handler);
 
   var tryParseHeader = () => {
     let arr = new Uint8Array(parts);
