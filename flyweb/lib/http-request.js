@@ -10,9 +10,8 @@ var HTTPServer;
 var CRLF = '\r\n';
 var CRLFx2 = CRLF + CRLF;
 
-function HTTPRequest(transport) {
-  var parts = [];
-  var receivedLength = 0;
+function HTTPRequest(transport, options) {
+  options = options || {};
 
   if (!HTTPServer)
     HTTPServer = require('./http-server').HTTPServer;
@@ -23,14 +22,27 @@ function HTTPRequest(transport) {
   var binaryInputStream = utils.newBinaryInputStream(inputStream);
 
   this.transport = transport;
-  this.inputStream = asyncInputStream;
+  this.inputStream = inputStream;
+  this.asyncInputStream = asyncInputStream;
+  this.binaryInputStream = binaryInputStream;
+  this.raw = options.raw ? true : false;
 
+  if (this.raw)
+    this.receiveRaw();
+  else
+    this.receiveParsed();
+}
+HTTPRequest.prototype = new EventTarget();
+HTTPRequest.prototype.constructor = HTTPRequest;
+
+HTTPRequest.prototype.receiveParsed = function () {
+  var parts = [];
   var readingHeader = true;
   var readingBody = false;
 
   var handler = (stream) => {
     let avail;
-    try { avail = asyncInputStream.available(); }
+    try { avail = this.asyncInputStream.available(); }
     catch (err) {
         // Closed stream.
         return;
@@ -49,7 +61,7 @@ function HTTPRequest(transport) {
         return;
     }
 
-    let data = binaryInputStream.readByteArray(avail);
+    let data = this.binaryInputStream.readByteArray(avail);
     if (readingHeader) {
       if (data) {
         for (let byte of data)
@@ -58,13 +70,13 @@ function HTTPRequest(transport) {
 
       if (tryParseHeader()) {
         if (readingBody) {
-          asyncInputStream.asyncWait({
+          this.asyncInputStream.asyncWait({
             onInputStreamReady: utils.tryWrapF(handler)
           }, 0, 0, utils.currentThread());
         }
         return;
       }
-      asyncInputStream.asyncWait({
+      this.asyncInputStream.asyncWait({
         onInputStreamReady: utils.tryWrapF(handler)
       }, 0, 0, utils.currentThread());
       return;
@@ -93,13 +105,13 @@ function HTTPRequest(transport) {
     }
   };
 
-  asyncInputStream.asyncWait({
+  this.asyncInputStream.asyncWait({
     onInputStreamReady: utils.tryWrapF(handler)
   }, 0, 0, utils.currentThread());
 
   var tryParseHeader = () => {
     let arr = new Uint8Array(parts);
-    let resp = parseHeader(this, arr.buffer);
+    let resp = this.parseHeader(arr.buffer);
     if (this.invalid) {
       transport.close(Cr.NS_OK);
       this.dispatchEvent('error', this);
@@ -126,15 +138,11 @@ function HTTPRequest(transport) {
     this.dispatchEvent('headerComplete', this);
     return true;
   };
-}
+};
 
-HTTPRequest.prototype = new EventTarget();
-
-HTTPRequest.prototype.constructor = HTTPRequest;
-
-function parseHeader(request, data) {
+HTTPRequest.prototype.parseHeader = function (data) {
   if (!data) {
-    request.invalid = true;
+    this.invalid = true;
     return false;
   }
 
@@ -156,7 +164,7 @@ function parseHeader(request, data) {
   var version = requestLine[2];
 
   if (version !== HTTPServer.HTTP_VERSION) {
-    request.invalid = true;
+    this.invalid = true;
     return false;
   }
 
@@ -178,15 +186,15 @@ function parseHeader(request, data) {
     headers[name] = value;
   });
 
-  request.method  = method;
-  request.path    = path;
-  request.params  = params;
-  request.headers = headers;
+  this.method  = method;
+  this.path    = path;
+  this.params  = params;
+  this.headers = headers;
 
   if (headers['Content-Length']) {
-    request.content = [];
+    this.content = [];
     for (var i = 0; i < body.length; i++)
-      request.content.push(body[i]);
+      this.content.push(body[i]);
     return true;
   }
 

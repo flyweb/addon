@@ -13,11 +13,12 @@ var CRLF = '\r\n';
 
 function HTTPServer(port, options) {
   this.port = port;
-
   options = options || {};
-  for (var option in options) {
-    this[option] = options[option];
-  }
+
+  if (options.rawRequest)
+    this.rawRequest = true;
+  else
+    this.rawRequest = false;
 
   this.running = false;
 }
