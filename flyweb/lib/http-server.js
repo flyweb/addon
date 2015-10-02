@@ -41,10 +41,8 @@ HTTPServer.prototype.start = function() {
   socket.asyncListen({
     onSocketAccepted: (sock, transport) => {
       this.transport = transport;
-      dump("KVKV: Accepted new socket!\n");
       var request = new HTTPRequest(transport);
       request.addEventListener('complete', () => {
-        dump("KVKV: REQUEST COMPLETE!: " + JSON.stringify(request) + "\n");
         var response = new HTTPResponse(transport);
         if (this.onrequest)
           this.onrequest(request, response);

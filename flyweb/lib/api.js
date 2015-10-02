@@ -17,8 +17,14 @@ function dispatchRequest(worker, name, obj, responseCallback) {
         func = stopServer;
     } else if (name == "httpResponse") {
         func = httpResponse;
+    } else if (name == "httpResponseStream") {
+        func = httpResponseStream;
+    } else if (name == "httpResponseStreamData") {
+        func = httpResponseStreamData;
+    } else if (name == "httpResponseStreamEnd") {
+        func = httpResponseStreamEnd;
     } else {
-        dump("dispatchMessage: unhandled name " + name +
+        dump("[FlyWeb-Addon] dispatchMessage: unhandled name " + name +
              " (" + JSON.stringify(obj) + ")\n");
         return;
     }
@@ -67,7 +73,7 @@ function discoverNearbyServices(worker, obj, responseCallback) {
                         service: service
                     }));
                 } catch(err) {
-                    dump("Error emitting serviceFounc message: "
+                    dump(debugPrefix + " Error emitting serviceFounc message: "
                         + err.message + "\n" + err.stack + "\n");
                 }
             } else {
@@ -120,10 +126,11 @@ function publishServer(worker, obj, responseCallback) {
 
     // Request handler - register request and response,
     // send message to content script about request.
-    httpServer.onrequest = function (request, response) {
+    httpServer.onrequest = (request, response) => {
         let httpRequestId = newHTTPRequestId();
         HTTPRequests[httpRequestId] = {httpRequestId, request, response};
         let {method, path, params, headers, content} = request;
+
         worker.port.emit("message", JSON.stringify({
             messageName: "httpRequest",
             messageId: httpServerId,
@@ -163,6 +170,59 @@ function httpResponse(worker, obj, responseCallback) {
         responseCallback({error: err.message + "\n" + err.stack});
     });
     delete HTTPRequests[httpRequestId];
+}
+
+function httpResponseStream(worker, obj, responseCallback) {
+    let {httpRequestId, status} = obj;
+    if (!(httpRequestId in HTTPRequests)) {
+        responseCallback({error:"Invalid http request id: " + httpRequestId});
+        return;
+    }
+    let {response} = HTTPRequests[httpRequestId];
+    let responseStream = response.stream();
+    responseStream.addEventListener('complete', () => {
+      worker.port.emit('message', JSON.stringify({
+        messageName: 'httpResponseStreamComplete',
+        messageId: httpRequestId
+      }));
+    });
+    responseStream.addEventListener('error', () => {
+      worker.port.emit('message', JSON.stringify({
+        messageName: 'httpResponseStreamError',
+        messageId: httpRequestId
+      }));
+    });
+    HTTPRequests[httpRequestId].responseStream = responseStream;
+    responseCallback({});
+}
+
+function httpResponseStreamData(worker, obj, responseCallback) {
+    let {httpRequestId, data} = obj;
+    if (!(httpRequestId in HTTPRequests)) {
+        responseCallback({error:"Invalid http request id: " + httpRequestId});
+        return;
+    }
+    let {responseStream} = HTTPRequests[httpRequestId];
+    if (!responseStream) {
+        responseCallback({error:"Http request id: " + httpRequestId + " has no stream"});
+        return;
+    }
+    responseStream.addData(data);
+    responseCallback({});
+}
+function httpResponseStreamEnd(worker, obj, responseCallback) {
+    let {httpRequestId, data} = obj;
+    if (!(httpRequestId in HTTPRequests)) {
+        responseCallback({error:"Invalid http request id: " + httpRequestId});
+        return;
+    }
+    let {responseStream} = HTTPRequests[httpRequestId];
+    if (!responseStream) {
+        responseCallback({error:"Http request id: " + httpRequestId + " has no stream"});
+        return;
+    }
+    responseStream.endData();
+    responseCallback({});
 }
 
 exports.dispatchRequest = dispatchRequest;

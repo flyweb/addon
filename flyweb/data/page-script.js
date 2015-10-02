@@ -15,7 +15,7 @@ function AddHandler(name, messageId, handler) {
 
     let subHandlers = Handlers[name];
     if (messageId in subHandlers) {
-        dump("HANDLER CONFLICT FOR ID: " + messageId + "!\n");
+        dump("[ContentScript] HANDLER CONFLICT FOR ID: " + messageId + "!\n");
         dump(new Error().stack + "\n");
     }
     let descriptor = {handler};
@@ -29,7 +29,7 @@ function SendRequest(name, obj, handler) {
     self.port.emit("request", JSON.stringify(obj));
 }
 function HandleMessage(kind, message) {
-    dump("Content script got " + kind + ": " + message + "\n");
+    // dump("[ContentScript] Got " + kind + ": " + message + "\n");
     let obj = JSON.parse(message);
     let {messageName, messageId} = obj;
     if (!obj.messageName) {
@@ -110,9 +110,6 @@ function discoverNearbyServices(spec) {
     return new window.Promise(XF((resolve, reject) => {
         try {
             SendRequest("discoverNearbyServices", {spec}, resp => {
-                dump("discoverNearbyServices got response: " +
-                    JSON.stringify(resp));
-
                 // Handle error.
                 if (resp.error) {
                     reject(resp.error);
@@ -153,7 +150,6 @@ function discoverNearbyServices(spec) {
                         }));
                     },
                     onservicefound: function (callback) {
-                        dump("CONTENT HANDLER setting onservicefound\n");
                         onservicefound = callback;
                     },
                     onservicelost: function (callback) {
@@ -162,15 +158,11 @@ function discoverNearbyServices(spec) {
                 });
 
                 AddHandler("serviceFound", serviceListId, message => {
-                    dump("CONTENT HANDLER serviceFound: " +
-                        JSON.stringify(message) + "\n");
                     let {service} = message;
                     let descriptor = addGlobalService(service);
                     let {serviceId} = descriptor;
                     services.push(descriptor);
-                    dump("CONTENT HANDLER serviceFound: dispatching\n");
                     if (onservicefound) {
-                        dump("CONTENT HANDLER serviceFound: have onservicefound\n");
                         try {
                             onservicefound(CI({serviceId}));
                         } catch(err) {
@@ -181,11 +173,8 @@ function discoverNearbyServices(spec) {
                 });
                 AddHandler("serviceLost", serviceListId, message => {
                     let {service} = message;
-                    dump("CONTENT HANDLER serviceLost: " +
-                        JSON.stringify(message) + "\n");
                 });
 
-                dump("discoverNearbyServices added handlers.  Returning result\n");
                 try { resolve(result); }
                 catch(err) { reject(err.message + "\n" + err.stack); }
             });
@@ -250,8 +239,6 @@ function publishServer(name, options) {
             options = localOptions;
 
             SendRequest("publishServer", {name, options}, resp => {
-                dump("publishServer got response: " +
-                     JSON.stringify(resp) + "\n");
                 let {httpServerId} = resp;
 
                 let onrequest = null;
@@ -259,10 +246,7 @@ function publishServer(name, options) {
                 let result = CI({
                     name, options,
                     stop: function () {
-                        SendRequest("stopServer", {httpServerId}, resp => {
-                            dump("stopServer got response: " +
-                                 JSON.stringify(resp) + "\n");
-                        });
+                        SendRequest("stopServer", {httpServerId}, resp => {});
                     },
                     onrequest: function (callback) {
                         onrequest = callback;
@@ -270,28 +254,73 @@ function publishServer(name, options) {
                 });
 
                 AddHandler("httpRequest", httpServerId, message => {
-                    dump("CONTENT HANDLER serviceFound: " +
-                        JSON.stringify(message) + "\n");
                     let {httpRequestId, method, path,
                          params, headers, content} = message;
 
                     function sendResponse(status, headers, body) {
                         SendRequest("httpResponse", {httpRequestId, status,
                                                      headers, body},
+                            resp => {}
+                        );
+                    }
+                    function sendResponseStream(status) {
+                      return new window.Promise(XF((resolve, reject) => {
+                        SendRequest("httpResponseStream",
+                                    {httpRequestId, status},
                             resp => {
-                                dump("httpResponse got response " +
-                                     JSON.stringify(resp) + "\n");
+                                let error = null;
+                                let complete = false;
+
+                                let onerror = null;
+                                let oncomplete = null;
+
+                                let result = CI({
+                                    sendData: function (data) {
+                                        SendRequest("httpResponseStreamData",
+                                                    {httpRequestId, data}, resp => {});
+                                    },
+                                    end: function () {
+                                        SendRequest("httpResponseStreamEnd",
+                                                    {httpRequestId}, resp => {});
+                                    },
+                                    onerror: function (callback) {
+                                        onerror = callback;
+                                        if (error)
+                                            onerror();
+                                    },
+                                    oncomplete: function (callback) {
+                                        oncomplete = callback;
+                                        if (complete)
+                                            oncomplete();
+                                    }
+                                });
+
+                                AddHandler("httpResponseStreamError", httpRequestId, message => {
+                                    if (onerror)
+                                        onerror();
+                                    else
+                                        error = true;
+                                });
+                                AddHandler("httpResponseStreamComplete", httpRequestId, message => {
+                                    if (oncomplete)
+                                        oncomplete();
+                                    else
+                                        complete = true;
+                                });
+
+                                resolve(result);
                             }
                         );
+                      }));
                     }
                     if (onrequest) {
                         try {
                             onrequest(CI({
                                 method, path, params, headers, content,
-                                sendResponse
+                                sendResponse, stream: sendResponseStream
                             }));
                         } catch(err) {
-                            dump("Error calling page onrequest: "
+                            dump("Error calling page onrequest: " + err.message + "\n"
                                     + err.stack + "\n");
                         }
                     } else {

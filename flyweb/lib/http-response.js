@@ -27,8 +27,6 @@ HTTPResponse.prototype.send = function(status, headers, body) {
     let idx = 0;
   
     let sendData = (stream) => {
-      dump("KVKV: outputStreamReady idx=" + idx + "/" + response.length + "!\n");
-  
       if (idx < response.length) {
         let written;
         try {
@@ -44,7 +42,6 @@ HTTPResponse.prototype.send = function(status, headers, body) {
         }, 0, 128, utils.currentThread());
   
       } else {
-        dump("KVKV: closing!\n");
         try {
           this.outputStream.close();
           this.transport.close(Cr.NS_OK);
@@ -61,6 +58,81 @@ HTTPResponse.prototype.send = function(status, headers, body) {
       onOutputStreamReady: sendData
     }, 0, 128, utils.currentThread());
   });
+};
+
+function HTTPResponseStream(response, outputStream, transport) {
+  this.response_ = response;
+  this.outputStream_ = outputStream;
+  this.transport_ = transport;
+  this.buffer_ = [];
+  this.done_ = false;
+  this.error_ = false;
+  this.transmitting_ = false;
+}
+HTTPResponseStream.prototype = Object.create(EventTarget.prototype);
+HTTPResponseStream.prototype.constructor = HTTPResponseStream;
+
+HTTPResponseStream.prototype.addData = function (data) {
+  if (this.done_ || this.error_)
+    return;
+  if (data.length == 0)
+    return;
+  this.buffer_.push(data);
+  this.ensureTransmitting();
+};
+HTTPResponseStream.prototype.endData = function () {
+  if (this.done_ || this.error_)
+    return;
+  this.done_ = true;
+  if (this.transmitting_)
+    return;
+  // If already idling, close the connection.
+  this.close();
+};
+HTTPResponseStream.prototype.ensureTransmitting = function () {
+  if (this.transmitting_)
+    return;
+  this.outputStream_.asyncWait({
+    onOutputStreamReady: stream => { this.transmit(); }
+  }, 0, 0, utils.currentThread());
+  this.transmitting_ = true;
+};
+HTTPResponseStream.prototype.transmit = function () {
+  this.transmitting_ = false;
+
+  if (this.buffer_.length > 0) {
+    let data = this.buffer_.join('');
+    this.buffer_.splice(0);
+
+    let written;
+    try {
+      written = this.outputStream_.write(data, data.length);
+    } catch(err) {
+        utils.dumpError(err);
+        this.error_ = true;
+        this.done_ = true;
+        this.dispatchEvent('error', err);
+        return;
+    }
+
+    if (written < data.length) {
+        this.buffer_.push(data.substr(written));
+    }
+    this.ensureTransmitting();
+    return;
+  }
+
+  if (this.done_) {
+    this.close();
+  }
+};
+HTTPResponseStream.prototype.close = function () {
+  this.outputStream_.close();
+  this.transport_.close(Cr.NS_OK);
+  this.dispatchEvent('complete');
+}
+HTTPResponse.prototype.stream = function() {
+   return new HTTPResponseStream(this, this.outputStream, this.transport);
 };
 
 function createResponseHeader(status, headers) {

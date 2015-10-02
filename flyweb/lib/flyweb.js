@@ -18,16 +18,18 @@ PageMod.PageMod({
     include: "*",
     contentScriptFile: Self.data.url('page-script.js'),
     onAttach: function (worker) {
-        dump("ATTACHED!\n");
+        dump("[FlyWeb-Addon] Attached to page!\n");
         worker.port.on("request", function (message) {
-            dump("Addon got message: " + message + "\n");
             let obj = JSON.parse(message);
-            if (!obj.messageName) {
-                dump("  No name for message!?\n");
-                return;
-            }
-            if (!obj.messageId) {
-                dump("  No id for message!? (" + obj.messageName + ")\n");
+            // Only dump message contents if there is a message error.
+            if (!obj.messageName || !obj.messageId) {
+                dump("Addon got message: " + message + "\n");
+                if (!obj.messageName) {
+                    dump("  No name for message!?\n");
+                }
+                if (!obj.messageId) {
+                    dump("  No id for message!? (" + obj.messageName + ")\n");
+                }
                 return;
             }
             let {messageName, messageId} = obj;

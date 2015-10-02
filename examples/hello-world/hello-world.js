@@ -64,6 +64,7 @@ function establishConnection(serviceId) {
         navigator.connectToService(serviceId).then(conn => {
             console.log('establishConnection got connection');
             FlyWebConnection = conn;
+            window.open(conn.url, '_blank');
         });
     }
 }
@@ -126,9 +127,94 @@ function startServer() {
     navigator.publishServer(ServerName, {}).then(server => {
         console.log("Published server: " + JSON.stringify(server));
         server.onrequest(requestEvent => {
-            requestEvent.sendResponse(200, {"Content-Type": "text/html"},
-                        "<html><head><title>AAAAAAAAAHAHAHAHAHAHAH!!!!!!</title></head><body><h1>BOOYEAH</h1></body></html>");
-            console.log("GOT REQUEST: ", requestEvent);
+            var method = requestEvent.method;
+            var path = requestEvent.path;
+            console.log("Got " + method + " request for " + path);
+            if (path == "/get-text") {
+                serveGetText(requestEvent);
+            } else if (path == "/") {
+                serveMainPage(requestEvent);
+            } else {
+                serveErrorPage(requestEvent);
+            }
         });
+    });
+}
+
+function serveGetText(requestEvent) {
+    requestEvent.stream().then(stream => {
+        stream.oncomplete(() => {
+            console.log("Sent data!\n");
+        });
+        var inputElement = document.getElementById('sendText');
+        var text = '' + inputElement.value;
+        var content = JSON.stringify({text: text});
+        stream.sendData("HTTP/1.1 200 OK\r\n");
+        stream.sendData("Content-Type: application/json\r\n");
+        stream.sendData("Content-Length: " + content.length + "\r\n");
+        stream.sendData("Access-Control-Allow-Origin: *\r\n");
+        stream.sendData("\r\n");
+        stream.sendData(content);
+        stream.end();
+    });
+}
+
+function serveMainPage(requestEvent) {
+    requestEvent.stream().then(stream => {
+        stream.oncomplete(() => {
+            console.log("Sent data!\n");
+        });
+        function updateThing() {
+          if (!window.UPDATE_TIME)
+            window.UPDATE_TIME = 100;
+          var xmlhttp = new XMLHttpRequest();
+          var oldText = window.OLD_TEXT || '';
+
+          xmlhttp.onreadystatechange = function() {
+            if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                var data = JSON.parse(xmlhttp.responseText);
+                if (data.text == oldText)
+                    return;
+                var elem = document.getElementById('h');
+                var text = (data.text.length > 0) ? "'" + data.text + "'" : "NOTHING!";
+                elem.innerHTML = "OTHER PAGE SAYS " + text;
+                window.OLD_TEXT = data.text;
+            }
+          }
+          xmlhttp.open("GET", "/get-text", true);
+          xmlhttp.send();
+
+          setTimeout(updateThing, window.UPDATE_TIME);
+        }
+        var content = ["<html><head><title>AAAAAAAAAHAHAHAHAHAHAH!!!!!!</title>",
+                       '<script type="text/javascript">',
+                       updateThing.toString(),
+                       '</script>',
+                       "</head>",
+                       '<body onload="updateThing()"><h1 id="h">OTHER PAGE SAYS WHAT?</h1></body>',
+                       "</html>"].join('\n');
+
+        stream.sendData("HTTP/1.1 200 OK\r\n");
+        stream.sendData("Content-Type: text/html\r\n");
+        stream.sendData("Content-Length: " + content.length + "\r\n");
+        stream.sendData("\r\n");
+        stream.sendData(content);
+        stream.end();
+    });
+}
+
+function serveErrorPage(requestEvent) {
+    requestEvent.stream().then(stream => {
+        stream.oncomplete(() => {
+            console.log("Sent data!\n");
+        });
+        var content = ["<html><head><title>Not Found</title></head>",
+                       '<body><h1>PAGE NOT FOUND</h1></body></html>'].join('\n');
+        stream.sendData("HTTP/1.1 404 Not Found\r\n");
+        stream.sendData("Content-Type: text/html\r\n");
+        stream.sendData("Content-Length: " + content.length + "\r\n");
+        stream.sendData("\r\n");
+        stream.sendData(content);
+        stream.end();
     });
 }
