@@ -282,20 +282,20 @@ function publishServer(name, options) {
                             }
                         }
 
-                        SendRequest("httpRequestRaw", {httpRequestId}, resp => {
-                            AddHandler("httpRequestData", httpRequestId, message => {
-                                if (ondata)
-                                    ondata(message.data);
-                                else
-                                    bufferedData = message.data;
-                            });
-                            AddHandler("httpRequestComplete", httpRequestId, message => {
-                                if (oncomplete)
-                                    oncomplete();
-                                else
-                                    complete = true;
-                            });
+                        AddHandler("httpRequestData", httpRequestId, message => {
+                            if (ondata)
+                                ondata(CI(message.data));
+                            else
+                                bufferedData = message.data;
                         });
+                        AddHandler("httpRequestComplete", httpRequestId, message => {
+                            if (oncomplete)
+                                oncomplete();
+                            else
+                                complete = true;
+                        });
+
+                        SendRequest("httpRequestRaw", {httpRequestId}, resp => {});
 
                         return CI({
                             ondata: setondata,

@@ -154,6 +154,7 @@ function httpRequestRaw(worker, obj, responseCallback) {
         responseCallback({error: "Invalid http request id: " + httpRequestId});
         return;
     }
+    let {request} = HTTPRequests[httpRequestId];
     request.addEventListener('data', (data) => {
         worker.port.emit("message", JSON.stringify({
             messageName: "httpRequestData",
