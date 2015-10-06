@@ -15,6 +15,10 @@ function dispatchRequest(worker, name, obj, responseCallback) {
         func = publishServer;
     } else if (name == "stopServer") {
         func = stopServer;
+    } else if (name == "httpRequestRaw") {
+        func = httpRequestRaw;
+    } else if (name == "httpRequestParsed") {
+        func = httpRequestParsed;
     } else if (name == "httpResponse") {
         func = httpResponse;
     } else if (name == "httpResponseStream") {
@@ -33,7 +37,7 @@ function dispatchRequest(worker, name, obj, responseCallback) {
         func(worker, obj, responseCallback);
     } catch(err) {
         dump("[FlyWeb-Addon] dispatchRequest '" + name + "' failed: " +
-                err.stack + "\n");
+                err.message + "\n" + err.stack + "\n");
         responseCallback({error:err.stack});
     }
 }
@@ -131,40 +135,58 @@ function publishServer(worker, obj, responseCallback) {
     httpServer.onrequest = (request, response) => {
         let httpRequestId = newHTTPRequestId();
         HTTPRequests[httpRequestId] = {httpRequestId, request, response};
-
-        if (rawRequest) {
-            request.addEventListener('data', (data) => {
-                worker.port.emit("message", JSON.stringify({
-                    messageName: "httpRequestData",
-                    messageId: httpRequestId,
-                    data: data
-                }));
-            });
-            request.addEventListener('complete', () => {
-                worker.port.emit("message", JSON.stringify({
-                    messageName: "httpRequestComplete",
-                    messageId: httpRequestId
-                }));
-            });
-            worker.port.emit("message", JSON.stringify({
-                messageName: "httpRequest",
-                messageId: httpServerId,
-                httpRequestId
-            }));
-        } else {
-            let {method, path, params, headers, content} = request;
-            worker.port.emit("message", JSON.stringify({
-                messageName: "httpRequest",
-                messageId: httpServerId,
-                httpRequestId, method, path, params, headers, content
-            }));
-        }
+        worker.port.emit("message", JSON.stringify({
+            messageName: "httpRequest",
+            messageId: httpServerId,
+            httpRequestId
+        }));
     };
 
     let service = DNSSD.registerService("_flyweb._tcp.local", name, port,
                                         options);
     HTTPServers[httpServerId] = {httpServerId, httpServer, service};
     responseCallback({httpServerId});
+}
+
+function httpRequestRaw(worker, obj, responseCallback) {
+    let httpRequestId = obj.httpRequestId;
+    if (!HTTPRequests[httpRequestId]) {
+        responseCallback({error: "Invalid http request id: " + httpRequestId});
+        return;
+    }
+    request.addEventListener('data', (data) => {
+        worker.port.emit("message", JSON.stringify({
+            messageName: "httpRequestData",
+            messageId: httpRequestId,
+            data: data
+        }));
+    });
+    request.addEventListener('complete', () => {
+        worker.port.emit("message", JSON.stringify({
+            messageName: "httpRequestComplete",
+            messageId: httpRequestId
+        }));
+    });
+    request.receiveRaw();
+}
+
+function httpRequestParsed(worker, obj, responseCallback) {
+    let httpRequestId = obj.httpRequestId;
+    if (!HTTPRequests[httpRequestId]) {
+        responseCallback({error: "Invalid http request id: " + httpRequestId});
+        return;
+    }
+    let {request} = HTTPRequests[httpRequestId];
+    request.addEventListener('complete', () => {
+        let {method, path, params, headers, content} = request;
+        worker.port.emit("message", JSON.stringify({
+            messageName: "httpRequestComplete",
+            messageId: httpRequestId,
+            method, path, params, headers, content
+        }));
+    });
+    request.receiveParsed();
+    responseCallback({});
 }
 
 function stopServer(worker, obj, responseCallback) {

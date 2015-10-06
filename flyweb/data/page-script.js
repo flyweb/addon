@@ -262,6 +262,58 @@ function publishServer(name, options) {
                 AddHandler("httpRequest", httpServerId, message => {
                     let {httpRequestId} = message;
 
+                    function requestRaw() {
+                        var bufferedData = null;
+                        var ondata = null;
+                        function setondata(callback) {
+                            ondata = callback;
+                            if (bufferedData) {
+                                try { ondata(CI(bufferedData)); }
+                                finally { bufferedData = []; }
+                            }
+                        }
+
+                        var complete = false;
+                        var oncomplete = null;
+                        function setoncomplete(callback) {
+                            oncomplete = callback;
+                            if (complete) {
+                                oncomplete();
+                            }
+                        }
+
+                        SendRequest("httpRequestRaw", {httpRequestId}, resp => {
+                            AddHandler("httpRequestData", httpRequestId, message => {
+                                if (ondata)
+                                    ondata(message.data);
+                                else
+                                    bufferedData = message.data;
+                            });
+                            AddHandler("httpRequestComplete", httpRequestId, message => {
+                                if (oncomplete)
+                                    oncomplete();
+                                else
+                                    complete = true;
+                            });
+                        });
+
+                        return CI({
+                            ondata: setondata,
+                            oncomplete: setoncomplete
+                        });
+                    }
+
+                    function requestParsed() {
+                      return new window.Promise(XF((resolve, reject) => {
+                        SendRequest("httpRequestParsed", {httpRequestId}, resp => {
+                            AddHandler("httpRequestComplete", httpRequestId, message => {
+                                let {method, path, params, headers, content} = message;
+                                resolve(CI({method, path, params, headers, content}));
+                            });
+                        });
+                      }));
+                    }
+
                     function sendResponse(status, headers, body) {
                         SendRequest("httpResponse", {httpRequestId, status,
                                                      headers, body},
@@ -280,7 +332,7 @@ function publishServer(name, options) {
                                 let oncomplete = null;
 
                                 let result = CI({
-                                    sendData: function (data) {
+                                    send: function (data) {
                                         SendRequest("httpResponseStreamData",
                                                     {httpRequestId, data}, resp => {});
                                     },
@@ -319,54 +371,12 @@ function publishServer(name, options) {
                       }));
                     }
 
-                    var bufferedData = null;
-                    var ondata = null;
-                    function setondata(callback) {
-                        ondata = callback;
-                        if (bufferedData) {
-                            try { ondata(CI(bufferedData)); }
-                            finally { bufferedData = []; }
-                        }
-                    }
-
-                    var complete = false;
-                    var oncomplete = null;
-                    function setoncomplete(callback) {
-                        oncomplete = callback;
-                        if (complete) {
-                            oncomplete();
-                        }
-                    }
-
-                    if (rawRequest) {
-                        AddHandler("httpRequestData", httpRequestId, message => {
-                            if (ondata)
-                                ondata(message.data);
-                            else
-                                bufferedData = message.data;
-                        });
-                        AddHandler("httpRequestComplete", httpRequestId, message => {
-                            if (oncomplete)
-                                oncomplete();
-                            else
-                                complete = true;
-                        });
-                    }
-
                     if (onrequest) {
                         try {
-                            if (rawRequest) {
-                                onrequest(CI({
-                                    sendResponse, stream: sendResponseStream,
-                                    ondata: setondata, oncomplete: setoncomplete
-                                }));
-                            } else {
-                                let {method, path, params, headers, content} = message;
-                                onrequest(CI({
-                                    method, path, params, headers, content,
-                                    sendResponse, stream: sendResponseStream
-                                }));
-                            }
+                            onrequest(CI({
+                                requestRaw, requestParsed,
+                                sendResponse, stream: sendResponseStream,
+                            }));
                         } catch(err) {
                             dump("Error calling page onrequest: " + err.message + "\n"
                                     + err.stack + "\n");

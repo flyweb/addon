@@ -127,21 +127,18 @@ function startServer() {
     navigator.publishServer(ServerName).then(server => {
         console.log("Published server: " + JSON.stringify(server));
         server.onrequest(requestEvent => {
-            /*
-            requestEvent.ondata(data => {
-                console.log("SERVER GOT DATA: ", data);
+            requestEvent.requestParsed().then(parsedReq => {
+                var method = parsedReq.method;
+                var path = parsedReq.path;
+                console.log("Got " + method + " request for " + path);
+                if (path == "/get-text") {
+                    serveGetText(requestEvent);
+                } else if (path == "/") {
+                    serveMainPage(requestEvent);
+                } else {
+                    serveErrorPage(requestEvent);
+                }
             });
-            */
-            var method = requestEvent.method;
-            var path = requestEvent.path;
-            console.log("Got " + method + " request for " + path);
-            if (path == "/get-text") {
-                serveGetText(requestEvent);
-            } else if (path == "/") {
-                serveMainPage(requestEvent);
-            } else {
-                serveErrorPage(requestEvent);
-            }
         });
     });
 }
@@ -154,12 +151,12 @@ function serveGetText(requestEvent) {
         var inputElement = document.getElementById('sendText');
         var text = '' + inputElement.value;
         var content = JSON.stringify({text: text});
-        stream.sendData("HTTP/1.1 200 OK\r\n");
-        stream.sendData("Content-Type: application/json\r\n");
-        stream.sendData("Content-Length: " + content.length + "\r\n");
-        stream.sendData("Access-Control-Allow-Origin: *\r\n");
-        stream.sendData("\r\n");
-        stream.sendData(content);
+        stream.send("HTTP/1.1 200 OK\r\n");
+        stream.send("Content-Type: application/json\r\n");
+        stream.send("Content-Length: " + content.length + "\r\n");
+        stream.send("Access-Control-Allow-Origin: *\r\n");
+        stream.send("\r\n");
+        stream.send(content);
         stream.end();
     });
 }
@@ -199,11 +196,11 @@ function serveMainPage(requestEvent) {
                        '<body onload="updateThing()"><h1 id="h">OTHER PAGE SAYS WHAT?</h1></body>',
                        "</html>"].join('\n');
 
-        stream.sendData("HTTP/1.1 200 OK\r\n");
-        stream.sendData("Content-Type: text/html\r\n");
-        stream.sendData("Content-Length: " + content.length + "\r\n");
-        stream.sendData("\r\n");
-        stream.sendData(content);
+        stream.send("HTTP/1.1 200 OK\r\n");
+        stream.send("Content-Type: text/html\r\n");
+        stream.send("Content-Length: " + content.length + "\r\n");
+        stream.send("\r\n");
+        stream.send(content);
         stream.end();
     });
 }
@@ -215,11 +212,11 @@ function serveErrorPage(requestEvent) {
         });
         var content = ["<html><head><title>Not Found</title></head>",
                        '<body><h1>PAGE NOT FOUND</h1></body></html>'].join('\n');
-        stream.sendData("HTTP/1.1 404 Not Found\r\n");
-        stream.sendData("Content-Type: text/html\r\n");
-        stream.sendData("Content-Length: " + content.length + "\r\n");
-        stream.sendData("\r\n");
-        stream.sendData(content);
+        stream.send("HTTP/1.1 404 Not Found\r\n");
+        stream.send("Content-Type: text/html\r\n");
+        stream.send("Content-Length: " + content.length + "\r\n");
+        stream.send("\r\n");
+        stream.send(content);
         stream.end();
     });
 }

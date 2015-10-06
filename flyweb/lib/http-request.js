@@ -24,12 +24,6 @@ function HTTPRequest(transport, options) {
   this.inputStream = inputStream;
   this.asyncInputStream = asyncInputStream;
   this.binaryInputStream = binaryInputStream;
-  this.raw = options.raw ? true : false;
-
-  if (this.raw)
-    this.receiveRaw();
-  else
-    this.receiveParsed();
 }
 HTTPRequest.prototype = new EventTarget();
 HTTPRequest.prototype.constructor = HTTPRequest;

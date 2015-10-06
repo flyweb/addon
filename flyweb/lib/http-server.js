@@ -41,23 +41,14 @@ HTTPServer.prototype.start = function() {
   this.port = socket.port;
   socket.asyncListen({
     onSocketAccepted: (sock, transport) => {
-      if (this.rawRequest) {
-          // Don't accept requests until 'onrequest' is installed.
-          if (!this.onrequest) {
-            this.transport_.close(Cr.NS_OK);
-            return;
-          }
-          var request = new HTTPRequest(transport, {raw: true});
-          var response = new HTTPResponse(transport);
-          this.onrequest(request, response);
-      } else {
-          var request = new HTTPRequest(transport, {raw: false});
-          request.addEventListener('complete', () => {
-            var response = new HTTPResponse(transport);
-            if (this.onrequest)
-              this.onrequest(request, response);
-          });
+      // Don't accept requests until 'onrequest' is installed.
+      if (!this.onrequest) {
+        this.transport_.close(Cr.NS_OK);
+        return;
       }
+      var request = new HTTPRequest(transport);
+      var response = new HTTPResponse(transport);
+      this.onrequest(request, response);
     },
 
     onStopListening: (sock, status) => {
