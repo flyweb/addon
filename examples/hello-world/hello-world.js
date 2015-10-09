@@ -179,6 +179,13 @@ function serveWebSocket(requestEvent, instream, headers) {
             instream, outstream, headers, onmessage, onerror,
             stringMessage: true});
         window.SERVER_WS = ws;
+
+        var inputElement = document.getElementById('sendText');
+        inputElement.onkeyup = function () {
+            var text = '' + inputElement.value;
+            var content = JSON.stringify({text: text});
+            ws.send(content);
+        };
     });
 }
 
@@ -190,6 +197,19 @@ function serveMainPage(requestEvent) {
         function updateThing() {
           if (!window.UPDATE_TIME)
             window.UPDATE_TIME = 60000;
+
+          var wsurl = "ws://" + window.location.host + "/web/socket";
+          var ws = new WebSocket(wsurl);
+
+          ws.onmessage = function (msg) {
+            var data = JSON.parse(msg.data);
+            var elem = document.getElementById('h');
+            var text = (data.text.length > 0) ? "'" + data.text + "'" : "NOTHING!";
+            elem.innerHTML = "WebSocket SAYS " + text;
+            window.OLD_TEXT = data.text;
+          }
+
+          /*
           var xmlhttp = new XMLHttpRequest();
           var oldText = window.OLD_TEXT || '';
 
@@ -206,6 +226,7 @@ function serveMainPage(requestEvent) {
           }
           xmlhttp.open("GET", "/get-text", true);
           xmlhttp.send();
+          */
 
           setTimeout(updateThing, window.UPDATE_TIME);
         }
