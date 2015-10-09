@@ -19,6 +19,7 @@ PageMod.PageMod({
     contentScriptFile: Self.data.url('page-script.js'),
     onAttach: function (worker) {
         dump("[FlyWeb-Addon] Attached to page!\n");
+        API.registerWorker(worker);
         worker.port.on("request", function (message) {
             let obj = JSON.parse(message);
             // Only dump message contents if there is a message error.
@@ -40,6 +41,9 @@ PageMod.PageMod({
                 resultObj.messageId = messageId;
                 worker.port.emit("response", JSON.stringify(resultObj));
             });
+        });
+        worker.on('detach', function () {
+            API.unregisterWorker(this);
         });
     }
 });

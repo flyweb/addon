@@ -432,6 +432,7 @@ function addTxtRecord(svc, packet, section) {
 exports.startDiscovery = DNSSD.startDiscovery;
 exports.stopDiscovery = DNSSD.stopDiscovery;
 exports.registerService = DNSSD.registerService;
+exports.unregisterService = DNSSD.unregisterService;
 exports.discoverRegistry = discoverRegistry;
 exports.discoverListeners = discoverListeners;
 exports.getIp = utils.getIp;

@@ -145,6 +145,7 @@ function publishServer(worker, obj, responseCallback) {
     let service = DNSSD.registerService("_flyweb._tcp.local", name, port,
                                         options);
     HTTPServers[httpServerId] = {httpServerId, httpServer, service};
+    getWorkerInfo(worker).servers.push({httpServerId});
     responseCallback({httpServerId});
 }
 
@@ -190,16 +191,22 @@ function httpRequestParsed(worker, obj, responseCallback) {
     responseCallback({});
 }
 
+function stopServerImpl(httpServerId) {
+    dump("Stopping server with id " + httpServerId + "\n");
+    if (!(httpServerId in HTTPServers))
+        return;
+    let {service, httpServer} = HTTPServers[httpServerId];
+    DNSSD.unregisterService(service.fullname);
+    httpServer.stop();
+    delete HTTPServers[httpServerId];
+}
 function stopServer(worker, obj, responseCallback) {
     let {httpServerId} = obj;
     if (!(httpServerId in HTTPServers)) {
         responseCallback({error:"Invalid http server id: " + httpServerId});
         return;
     }
-    let {service, httpServer} = HTTPServers[httpServerId];
-    DNSSD.unregisterService(service.fullname);
-    httpServer.stop();
-    delete HTTPServers[httpServerId];
+    stopServerImpl(httpServerId);
     responseCallback({});
 }
 
@@ -268,7 +275,52 @@ function httpResponseStreamEnd(worker, obj, responseCallback) {
         return;
     }
     responseStream.endData();
+    delete HTTPRequests[httpRequestId];
     responseCallback({});
 }
 
+var nextWorkerId = 0;
+function newWorkerId() {
+    return 'worker_' + (++nextWorkerId);
+}
+var WORKERS = [];
+function registerWorker(worker) {
+    var workerId = newWorkerId();
+    dump("Registering worker: " + workerId + "\n");
+    WORKERS.push({worker, workerId, servers: []});
+}
+function getWorkerIndex(worker) {
+    for (var i = 0; i < WORKERS.length; i++) {
+        if (WORKERS[i].worker == worker)
+            return i;
+    }
+}
+function getWorkerInfo(worker) {
+    var index = getWorkerIndex(worker);
+    if (index != -1)
+        return WORKERS[index];
+}
+function delWorkerInfo(worker) {
+    var index = getWorkerIndex(worker);
+    if (index != -1)
+        WORKERS.splice(index,1);
+}
+function unregisterWorker(worker) {
+    var info = getWorkerInfo(worker);
+    if (!info)
+        return;
+    dump("Unregistering worker: " + info.workerId + "\n");
+
+    // Stop all servers.
+    if (info.servers) {
+        for (var server of info.servers) {
+            stopServerImpl(server.httpServerId);
+        }
+    }
+
+    delWorkerInfo(worker);
+}
+
 exports.dispatchRequest = dispatchRequest;
+exports.registerWorker = registerWorker;
+exports.unregisterWorker = unregisterWorker;
