@@ -1,3 +1,9 @@
+# **** THIS REPO IS OBSOLETE!!! ****
+
+### FlyWeb has now landed in Firefox Nightly. See http://flyweb.github.io/ for more information
+
+-
+
 #FlyWeb
 
 This is a Firefox add-on to prototype the fly web concept.  Please note that this add-on is very experimental, and likely contains security vulnerabilities, and is not intended for any production usage.  Use at your own risk.
